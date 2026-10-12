@@ -4,6 +4,7 @@ packages:
   - cmake
   - curl
   - sbcl
+# TODO: mirror submissions override HTTPS with SSH; configure worker checkout access (#75).
 sources:
   - https://github.com/communal-software/trivial-simd
 tasks:

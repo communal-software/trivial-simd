@@ -51,19 +51,14 @@ run.
 
 ## Private mirror builds
 
-[`.build.yml`](../.build.yml) runs the suite on Linux with SBCL on every push
-to the private mirror, at no GitHub cost. It covers the same ground as the tier 1
-SBCL job.
+Private mirror pushes submit [`.build.yml`](../.build.yml) for Linux/SBCL checks.
+The automatic submission uses the mirror's SSH checkout URL and requires worker
+access to that repository. See the [checkout limitation](#limitations).
 
 ## Cost
 
 Private repositories bill macOS minutes at about ten times and Windows at about
 twice the Linux rate; public repositories use standard runners for free.[^cost]
-
-[^focus]: Paths matching `native/`, `native.lisp`, `backends.lisp`,
-    `kernel.lisp`, `kernel-math.lisp`, or `CMakeLists.txt`. The path lists are in the `paths`
-    section of the matrix file.
-[^cost]: GitHub's current rates are in its Actions billing documentation.
 
 ## BLAS measurements
 
@@ -90,3 +85,15 @@ gh workflow run encoded-matmul-profile.yml
 ```
 
 See [the measurement method](encoded-matmul-performance.md).
+
+## Limitations
+
+Automatic private-mirror builds fail during SSH checkout before any task runs.
+The committed manifest uses GitHub HTTPS, but automatic mirror submissions
+replace the checkout source. Worker checkout access is tracked in
+[#75](https://github.com/communal-software/trivial-simd/issues/75).
+
+[^focus]: Paths matching `native/`, `native.lisp`, `backends.lisp`,
+    `kernel.lisp`, `kernel-math.lisp`, or `CMakeLists.txt`. The path lists are in the `paths`
+    section of the matrix file.
+[^cost]: GitHub's current rates are in its Actions billing documentation.

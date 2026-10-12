@@ -1,0 +1,20 @@
+Apple M1, x86-64 SBCL under Rosetta; emulation, not native Intel/AMD hardware
+One fresh process, median of three calibrated batches
+
+SBCL 2.6.8.roswell X86-64; 8192x2048 weights
+nd-convert foreign (16777216): 7.949 ms; Lisp bytes 0.0d0
+nd-convert foreign (8192 2048): 7.992 ms; Lisp bytes 0.0d0
+flat convert foreign: 8.064 ms; Lisp bytes 0.0d0
+nd-convert Lisp: 8.006 ms; Lisp bytes 0.0d0
+F16 native n=1: 9.781 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=1: 21.741 ms; Lisp bytes 35814.5d0
+F16 native n=6: 26.058 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=6: 22.078 ms; Lisp bytes 36834.5d0
+F16 native n=46: 149.012 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=46: 62.335 ms; Lisp bytes 36834.5d0
+BF16 native n=1: 3.998 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=1: 15.970 ms; Lisp bytes 35814.5d0
+BF16 native n=6: 14.690 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=6: 16.296 ms; Lisp bytes 36834.5d0
+BF16 native n=46: 69.115 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=46: 56.649 ms; Lisp bytes 36834.5d0

@@ -62,6 +62,7 @@ static int valid_span(int64_t rows, int64_t columns, int64_t stride, int64_t siz
 }
 
 #ifdef TS_ENCODED_PACKED
+/* TODO: weight rereads cap large batches; use cache-blocked panels (#74). */
 #define DEFINE_ENCODED_TILE(name, ROWS, COLS) \
 static void name(int f16, int64_t n, int64_t m, int64_t k, \
                  const uint16_t *weights, int64_t ws, const float *x, int64_t xs, float *out, int64_t os) { \

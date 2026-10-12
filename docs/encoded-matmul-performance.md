@@ -17,6 +17,21 @@ SBCL 2.6.8, native NEON, pointer access, 8192×2048 weight rows; median millisec
 
 Direct calls use stack-sized tiles and require no f32 weight allocation. The comparison reuses a 256×2048 f32 scratch buffer and includes conversion and every BLAS call. Its Lisp metadata allocation is approximately 35–37 KB per call.[^allocation]
 
+## Native x86-64
+
+Intel Xeon 6973P-C GitHub runner, SBCL 2.6.9, native pointer access; the same matrix size and five-process method. Encoded matmul uses SSE2; the native BLAS comparison uses its available AVX/FMA path. [Raw measurements](benchmark-runs/2026-10-12-encoded-matmul-linux.txt) and [profile run](https://github.com/communal-software/trivial-simd/actions/runs/38310528630).
+
+| Encoding | Activation rows | Direct matmul | Convert 256 rows + BLAS |
+|---|---:|---:|---:|
+| f16 | 1 | 9.375 | 17.500 |
+| f16 | 6 | 23.000 | 17.750 |
+| f16 | 46 | 151.001 | 34.000 |
+| bf16 | 1 | 2.625 | 12.000 |
+| bf16 | 6 | 11.375 | 12.125 |
+| bf16 | 46 | 76.000 | 28.000 |
+
+Times are milliseconds. This virtualized runner measures native x86-64 instructions, rather than Rosetta emulation. The [separate Rosetta record](benchmark-runs/2026-10-12-encoded-matmul-rosetta.txt) describes Apple M1 emulation and is not an Intel throughput result.
+
 ## Contiguous foreign conversion
 
 The same profile widens 16,777,216 f16 values into a Lisp f32 vector. N-D foreign conversion uses the packed converter without an element snapshot.
@@ -40,7 +55,7 @@ The manual **Encoded matmul profile** workflow runs the same profile in five fre
 
 ## Limitations
 
-Large activation batches reread weights per activation tile. These kernels do not replace a cache-blocked GEMM for every batch size. Measurements use one matrix size and finite constant operands; they do not establish performance for every inference workload or CPU.
+Large activation batches reread weights per activation tile. These kernels do not replace a cache-blocked GEMM for every batch size. Measurements use one matrix size and finite constant operands; they do not establish performance for every inference workload or CPU. Large-batch cache blocking and guarded x86 F16C/AVX paths are tracked in [#74](https://github.com/communal-software/trivial-simd/issues/74).
 
 [^method]: Each process checks outputs and reports a warmed median of three calibrated batches. Timings include Lisp validation, pinning and native calls. Weights contain encoded 1.0 and activations contain f32 0.5. The BLAS comparison uses trivial-simd's native GEMM, rather than an external system BLAS.
 [^allocation]: The SBCL allocation sample covers 32 calls and excludes foreign memory. Small metadata allocations can fall below the counter's reporting granularity; a zero sample does not prove that a call allocates no Lisp objects.

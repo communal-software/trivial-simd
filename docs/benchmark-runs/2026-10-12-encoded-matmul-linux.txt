@@ -1,0 +1,177 @@
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 57 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  4
+On-line CPU(s) list:                     0-3
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Xeon(R) 6973P-C
+CPU family:                              6
+Model:                                   173
+Thread(s) per core:                      2
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                1
+CPU(s) scaling MHz:                      160%
+CPU max MHz:                             2600.0000
+CPU min MHz:                             800.0000
+BogoMIPS:                                5199.99
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq vmx ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch tpr_shadow ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 vnmi avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk ibt amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+Virtualization:                          VT-x
+Hypervisor vendor:                       Microsoft
+Virtualization type:                     full
+L1d cache:                               96 KiB (2 instances)
+L1i cache:                               128 KiB (2 instances)
+L2 cache:                                4 MiB (2 instances)
+L3 cache:                                480 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-3
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Mitigation; Aligned branch/return thunks
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Vulnerable
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Vulnerable
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Retpolines; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Retpoline
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+Trial 1
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/package.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/package-tmpAAURSO1.fasl
+; compilation finished in 0:00:00.002
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/storage.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/storage-tmp5GEXGEG5.fasl
+; compilation finished in 0:00:00.025
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/level1.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/level1-tmpAR3FSGEY.fasl
+; compilation finished in 0:00:00.006
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/level1-extra.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/level1-extra-tmpJAIDFZTC.fasl
+; compilation finished in 0:00:00.078
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/matrix-view.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/matrix-view-tmp8V3J6PE9.fasl
+; compilation finished in 0:00:00.043
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/kernel.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/kernel-tmp9V47YWQF.fasl
+; compilation finished in 0:00:00.025
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/level2.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/level2-tmp9BN22RMA.fasl
+; compilation finished in 0:00:01.029
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/gemm-arithmetic.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/gemm-arithmetic-tmp1CXFJSK9.fasl
+; compilation finished in 0:00:00.026
+; compiling file "/home/runner/work/trivial-simd/trivial-simd/blas/level3.lisp" (written 12 OCT 2026 09:25:28 PM):
+
+
+; wrote /home/runner/.cache/common-lisp/sbcl-2.6.9.roswell-linux-x64/home/runner/work/trivial-simd/trivial-simd/blas/level3-tmpX4BRKI0R.fasl
+; compilation finished in 0:00:00.465
+SBCL 2.6.9.roswell X86-64; 8192x2048 weights
+nd-convert foreign (16777216): 8.625 ms; Lisp bytes 0.0d0
+nd-convert foreign (8192 2048): 8.625 ms; Lisp bytes 0.0d0
+flat convert foreign: 8.625 ms; Lisp bytes 0.0d0
+nd-convert Lisp: 8.625 ms; Lisp bytes 0.0d0
+F16 native n=1: 9.375 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=1: 17.500 ms; Lisp bytes 35814.5d0
+F16 native n=6: 23.000 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=6: 17.750 ms; Lisp bytes 36834.5d0
+F16 native n=46: 149.001 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=46: 33.500 ms; Lisp bytes 36834.5d0
+BF16 native n=1: 2.625 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=1: 11.500 ms; Lisp bytes 35814.5d0
+BF16 native n=6: 11.375 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=6: 11.875 ms; Lisp bytes 36834.5d0
+BF16 native n=46: 76.000 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=46: 26.500 ms; Lisp bytes 36834.5d0
+* Trial 2
+SBCL 2.6.9.roswell X86-64; 8192x2048 weights
+nd-convert foreign (16777216): 10.000 ms; Lisp bytes 0.0d0
+nd-convert foreign (8192 2048): 8.625 ms; Lisp bytes 0.0d0
+flat convert foreign: 8.750 ms; Lisp bytes 0.0d0
+nd-convert Lisp: 9.750 ms; Lisp bytes 0.0d0
+F16 native n=1: 9.375 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=1: 17.500 ms; Lisp bytes 35814.5d0
+F16 native n=6: 23.000 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=6: 17.750 ms; Lisp bytes 36834.5d0
+F16 native n=46: 153.001 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=46: 34.000 ms; Lisp bytes 36834.5d0
+BF16 native n=1: 2.594 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=1: 12.000 ms; Lisp bytes 35814.5d0
+BF16 native n=6: 13.250 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=6: 13.250 ms; Lisp bytes 36834.5d0
+BF16 native n=46: 89.001 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=46: 28.500 ms; Lisp bytes 36834.5d0
+* Trial 3
+SBCL 2.6.9.roswell X86-64; 8192x2048 weights
+nd-convert foreign (16777216): 8.750 ms; Lisp bytes 0.0d0
+nd-convert foreign (8192 2048): 8.750 ms; Lisp bytes 0.0d0
+flat convert foreign: 8.625 ms; Lisp bytes 0.0d0
+nd-convert Lisp: 8.875 ms; Lisp bytes 0.0d0
+F16 native n=1: 9.375 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=1: 17.501 ms; Lisp bytes 35814.5d0
+F16 native n=6: 26.751 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=6: 20.500 ms; Lisp bytes 36834.5d0
+F16 native n=46: 176.001 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=46: 38.000 ms; Lisp bytes 36834.5d0
+BF16 native n=1: 2.625 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=1: 11.625 ms; Lisp bytes 35814.5d0
+BF16 native n=6: 11.375 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=6: 12.125 ms; Lisp bytes 36834.5d0
+BF16 native n=46: 76.000 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=46: 28.000 ms; Lisp bytes 36834.5d0
+* Trial 4
+SBCL 2.6.9.roswell X86-64; 8192x2048 weights
+nd-convert foreign (16777216): 8.500 ms; Lisp bytes 0.0d0
+nd-convert foreign (8192 2048): 9.250 ms; Lisp bytes 0.0d0
+flat convert foreign: 10.000 ms; Lisp bytes 0.0d0
+nd-convert Lisp: 10.125 ms; Lisp bytes 0.0d0
+F16 native n=1: 9.375 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=1: 17.500 ms; Lisp bytes 35814.5d0
+F16 native n=6: 22.750 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=6: 17.500 ms; Lisp bytes 36834.5d0
+F16 native n=46: 150.000 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=46: 39.001 ms; Lisp bytes 36834.5d0
+BF16 native n=1: 3.031 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=1: 12.000 ms; Lisp bytes 35814.5d0
+BF16 native n=6: 11.375 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=6: 12.500 ms; Lisp bytes 36834.5d0
+BF16 native n=46: 76.001 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=46: 27.500 ms; Lisp bytes 36834.5d0
+* Trial 5
+SBCL 2.6.9.roswell X86-64; 8192x2048 weights
+nd-convert foreign (16777216): 8.625 ms; Lisp bytes 0.0d0
+nd-convert foreign (8192 2048): 8.625 ms; Lisp bytes 0.0d0
+flat convert foreign: 10.000 ms; Lisp bytes 0.0d0
+nd-convert Lisp: 10.125 ms; Lisp bytes 0.0d0
+F16 native n=1: 10.875 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=1: 17.500 ms; Lisp bytes 35814.5d0
+F16 native n=6: 22.750 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=6: 17.750 ms; Lisp bytes 36834.5d0
+F16 native n=46: 151.001 ms; Lisp bytes 0.0d0
+F16 convert256+BLAS n=46: 34.000 ms; Lisp bytes 36834.5d0
+BF16 native n=1: 2.625 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=1: 12.000 ms; Lisp bytes 35814.5d0
+BF16 native n=6: 11.375 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=6: 12.000 ms; Lisp bytes 36834.5d0
+BF16 native n=46: 76.000 ms; Lisp bytes 0.0d0
+BF16 convert256+BLAS n=46: 28.000 ms; Lisp bytes 36834.5d0
+* 

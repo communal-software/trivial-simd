@@ -37,6 +37,6 @@ See [encoded weight measurements](encoded-matmul-performance.md) for complete ca
 
 Arbitrary inner strides, general GEMM transpose/alpha/beta options, two encoded operands and f64 activations are outside these functions. Tensor callers adapt layouts and use f32 output.
 
-Large activation batches reread weights across tiles. At 46 rows on M1, conversion plus BLAS is faster; see [the measurements](encoded-matmul-performance.md).
+Large activation batches reread weights across tiles. At 46 rows on M1, conversion plus BLAS is faster; see [the measurements](encoded-matmul-performance.md). Further batch and x86 tuning is tracked in [#74](https://github.com/communal-software/trivial-simd/issues/74).
 
 [^widening]: f16 and bf16 widening is exact for finite values and quiets NaNs. ARM64 uses hardware f16 widening when its half-format and flush settings permit it; otherwise it constructs f32 values explicitly. Mathematical operations retain the caller's floating-point environment. SSE2 widening uses integer construction and exact subtraction for f16 subnormals.
