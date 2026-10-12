@@ -319,3 +319,44 @@
                      (funcall (second spec) out input '(2 3)))
                    (is (= (1+ before) calls))))))
         (setf (symbol-function 'simd::%native-nd-execute) original)))))
+
+(test nd-mixed-storage-avoids-disjoint-snapshots
+  (cffi:with-foreign-object (raw :uint16 24)
+    (dotimes (i 24) (setf (cffi:mem-aref raw :uint16 i) #x3c00))
+    (let* ((input (simd:make-vector-view raw :u16 24))
+           (out (make-array 24 :element-type 'single-float))
+           (original (symbol-function 'simd::nd-walk)) (walks 0))
+      (when simd::*native-nd-available-p*
+        (unwind-protect
+             (progn
+               (setf (symbol-function 'simd::nd-walk)
+                     (lambda (&rest arguments) (incf walks) (apply original arguments)))
+               (with-backend (:native)
+                 (simd:nd-convert! out input '(4 6) :input-encoding :f16)
+                 (is (zerop walks))
+                 (is (every (lambda (v) (= v 1f0)) out))))
+          (setf (symbol-function 'simd::nd-walk) original))))))
+
+#+(or sbcl ccl ecl)
+(test nd-mixed-storage-keeps-actual-snapshots
+  (dolist (backend (available-backends))
+    (with-backend (backend)
+      (let ((storage (values-for 32 'single-float 0)))
+        (simd::with-vector-pointer (pointer storage)
+          (let ((view (simd:make-vector-view pointer :f32 32)))
+            (simd:nd-add! storage view 1f0 '(3 5) :destination-start 1)
+            (is (equalp (values-for 15 'single-float 1) (subseq storage 1 16)))
+            (dotimes (i 32) (setf (aref storage i) (coerce i 'single-float)))
+            (simd:nd-add! view storage 1f0 '(3 5) :destination-start 0 :left-start 1)
+            (is (equalp (values-for 15 'single-float 2) (subseq storage 0 15)))
+            (simd:nd-add! storage view 1f0 '(3 5) :left-start 3 :left-strides '(0 0))
+            (is (every (lambda (v) (= v 6f0)) (subseq storage 0 15)))))))))
+
+#+(or sbcl ccl ecl)
+(test nd-mixed-storage-dtype-changing-overlap
+  (let ((storage (make-array 32 :element-type 'single-float :initial-element 1f0)))
+    (simd::with-vector-pointer (pointer storage)
+      (let ((half (simd:make-vector-view pointer :u16 64)))
+        (dotimes (i 16) (setf (simd::view-ref half i) #x4000))
+        (simd:nd-convert! storage half '(4 4) :input-encoding :f16)
+        (is (every (lambda (v) (= v 2f0)) (subseq storage 0 16)))))))

@@ -42,7 +42,7 @@ required operation capability select Lisp traversal.
 
 Shape `nil` executes one element. Any zero dimension makes the operation empty. Inputs may reuse storage locations; destinations must map each logical element to a distinct location. Validation checks types, layouts and options before writes, including empty calls.[^bounds]
 
-Overlapping inputs are read as if copied before writes. Exact same-dtype in-place mappings need no snapshot. Broadcast axes remain broadcast in snapshots. Different foreign views are compared by byte address. Arithmetic errors may leave part of the destination updated.
+Overlapping inputs are read as if copied before writes. Exact same-dtype in-place mappings need no snapshot. Broadcast axes remain broadcast in snapshots. Foreign views and mixed Lisp/foreign storage are compared by byte address while Lisp arrays remain pinned. Arithmetic errors may leave part of the destination updated.
 
 Run [the example](../examples/nd.lisp) for broadcasting, reversed inputs and a transposed destination.
 
@@ -56,18 +56,17 @@ Run [the example](../examples/nd.lisp) for broadcasting, reversed inputs and a t
 | SBCL SIMD backend | Supported contiguous array runs use SBCL SIMD; irregular layouts use Lisp |
 | Lisp backend, copied-array mode, or missing N-D native symbol | Direct Lisp execution |
 
-Adjacent compatible axes are coalesced. Ordinary execution allocates layout metadata, rather than element buffers or a gather/scatter pass. Unsafe aliases require snapshots; layout validation can require additional workspace. Small calls include fixed validation and dispatch overhead.[^native]
+Adjacent compatible axes are coalesced. Ordinary execution allocates layout metadata, rather than element buffers or a gather/scatter pass. With native pointer access, contiguous f16-to-f32 foreign input uses the packed converter directly. Unsafe aliases require snapshots; layout validation can require additional workspace. Small calls include fixed validation and dispatch overhead.[^native]
 
 ## Limitations
 
 | Limitation | Ticket |
 |---|---|
 | Irregular output uniqueness may use O(element count) workspace | [#63](https://github.com/communal-software/trivial-simd/issues/63) |
-| Mixed Lisp/foreign storage conservatively snapshots inputs | [#64](https://github.com/communal-software/trivial-simd/issues/64) |
 | Short calls pay fixed layout setup and validation overhead | [#65](https://github.com/communal-software/trivial-simd/issues/65) |
 | Existing 1-D strided APIs retain their separate staging paths | [#49](https://github.com/communal-software/trivial-simd/issues/49) |
 
 [^bounds]: Dimensions, starts, counts and stride arithmetic must fit the host's fixnum range and signed 64-bit native metadata. Byte stride/span arithmetic is checked as well. Empty layouts need no reachable storage, but their metadata still has to fit these ranges.
-[^native]: C traversal uses typed scalar loads for irregular strides. Native execution requires direct pointer access; otherwise the API uses Lisp rather than copying arrays into native buffers. The floating-point environment and numerical error behavior follow the corresponding bulk operation.
+[^native]: C traversal uses typed scalar loads for irregular strides. Implementations without pinned array access retain conservative mixed-storage snapshots. Native execution requires direct pointer access; otherwise the API uses Lisp rather than copying arrays into native buffers. The floating-point environment and numerical error behavior follow the corresponding bulk operation.
 
 [^activations]: GELU computes `0.5*x*(1+tanh(sqrt(2/pi)*(x+0.044715*x³)))`. Constants and intermediates use the input precision. SiLU and GELU execute in one traversal without intermediate arrays. Overflow, underflow, exceptional values and traps follow the active backend; GELU's cubic intermediate can overflow for large finite inputs.
