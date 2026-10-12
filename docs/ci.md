@@ -80,3 +80,13 @@ Run the **FMA profile** workflow manually for x86-64 Linux correctness checks
 and repeated SBCL and ECL FMA measurements. It includes the native
 hardware-selected and forced software profiles. Timing results appear in the
 job logs; see [FMA profiling](testing.md#fma-profiling) for local commands.
+
+## Encoded matmul profile
+
+The manual **Encoded matmul profile** workflow builds and checks the native library on x86-64 Linux, then runs five fresh SBCL processes comparing direct encoded matmul with 256-row conversion plus BLAS. It also measures contiguous foreign N-D conversion. The artifact contains machine details and complete-call timings.
+
+```sh
+gh workflow run encoded-matmul-profile.yml
+```
+
+See [the measurement method](encoded-matmul-performance.md).

@@ -27,7 +27,7 @@
                (:file "kernel-inputs")
                (:file "kernel-complex")
                (:file "kernel-plan") (:file "product")
-               (:file "q8"))
+               (:file "q8") (:file "encoded-matmul"))
   :in-order-to ((asdf:test-op (asdf:test-op "trivial-simd/tests"))))
 
 (asdf:defsystem "trivial-simd/tests"
@@ -62,7 +62,7 @@
                (:file "tests/kernel-inputs")
                (:file "tests/kernel-plans")
                (:file "tests/complex-kernels")
-               (:file "tests/q8"))
+               (:file "tests/q8") (:file "tests/encoded-matmul"))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
              (unless (uiop:symbol-call :trivial-simd/tests :run-tests)

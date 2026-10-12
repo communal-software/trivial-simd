@@ -568,6 +568,21 @@ Lisp measurements with the native conversion size gate disabled. Set
 Run profiles on an idle machine; repeat in fresh processes.
 The profiles do not run in the test suite or CI.
 
+## Encoded matmul
+
+Encoded matmul tests cover both formats, row padding, starts, tails, foreign
+storage, aliases, validation, empty contractions and missing-symbol fallback.
+The scalar and SIMD C harnesses check every encoded bit pattern against an
+independent reference, tile boundaries, guards and overflow rejection.
+
+```sh
+sbcl --dynamic-space-size 4096 --script tests/encoded-matmul-bench.lisp
+```
+
+See [the API and measurement method](encoded-matmul.md). N-D mixed-storage
+tests verify that disjoint inputs avoid snapshots and actual aliases retain
+input-before-write semantics, including dtype-changing aliases into pinned arrays.
+
 ## Limitations
 
 CCL x86-64 test setup and large data coercion remain costly under Rosetta,

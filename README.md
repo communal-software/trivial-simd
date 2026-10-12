@@ -55,6 +55,7 @@ and `cmake --build build --config Release`. The Lisp fallback loads without it.
 - [Reductions](docs/reductions.md)
 - [Vector views of foreign memory](docs/vector-views.md)
 - [Q8_0 matmul](docs/q8-matmul.md)
+- [f16 and bf16 matmul](docs/encoded-matmul.md)
 - [BLAS subsystem](docs/blas.md)
 - [Matrix storage design](docs/matrix-views.md)
 - [BLAS Level 2](docs/blas-level2.md)

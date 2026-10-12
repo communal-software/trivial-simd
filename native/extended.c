@@ -273,28 +273,12 @@ static uint32_t ts_round_bias(uint32_t bits, int rounding, unsigned shift) {
 static uint32_t ts_float_bits(float x) { uint32_t b; memcpy(&b, &x, sizeof b); return b; }
 static float ts_bits_float(uint32_t b) { float x; memcpy(&x, &b, sizeof x); return x; }
 
-static float ts_bf16_to_f32_scalar(uint16_t h) {
-    uint32_t b = (uint32_t)h << 16;
-    return ts_bits_float((b & 0x7fffffffu) > 0x7f800000u ? b | 0x400000u : b);
-}
+#include "encoded-load.h"
 
 static uint16_t ts_f32_to_bf16_scalar(float x, int rounding) {
     uint32_t b = ts_float_bits(x);
     if ((b & 0x7fffffffu) > 0x7f800000u) return (uint16_t)((b >> 16) | 0x40u);
     return (uint16_t)((b + ts_round_bias(b, rounding, 16)) >> 16);
-}
-
-static float ts_f16_to_f32_scalar(uint16_t h) {
-    uint32_t sign = (uint32_t)(h & 0x8000u) << 16, mantissa = h & 0x3ffu;
-    int exponent = (h >> 10) & 0x1f;
-    if (exponent == 0x1f)
-        return ts_bits_float(sign | 0x7f800000u | (mantissa << 13) | (mantissa ? 0x400000u : 0));
-    if (exponent == 0) {
-        if (mantissa == 0) return ts_bits_float(sign);
-        for (exponent = 1; !(mantissa & 0x400u); --exponent) mantissa <<= 1;
-        mantissa &= 0x3ffu;
-    }
-    return ts_bits_float(sign | ((uint32_t)(exponent + 112) << 23) | (mantissa << 13));
 }
 
 static uint16_t ts_f32_to_f16_scalar(float x, int rounding) {
@@ -397,12 +381,6 @@ void ts_extended_f32_to_f16(uint16_t *out, const float *input, size_t n, int rou
 }
 #endif
 #elif !defined(TS_SCALAR) && (defined(__x86_64__) || defined(_M_X64))
-/* B holds one bf16 in the high half of each lane. */
-static __m128 ts_bf16_to_f32_sse2(__m128i b) {
-    __m128i nan = _mm_cmpgt_epi32(_mm_and_si128(b, _mm_set1_epi32(0x7fffffff)),
-                                  _mm_set1_epi32(0x7f800000));
-    return _mm_castsi128_ps(_mm_or_si128(b, _mm_and_si128(nan, _mm_set1_epi32(0x400000))));
-}
 void ts_extended_bf16_to_f32(float *out, const uint16_t *input, size_t n) {
     size_t i = 0;
     const __m128i zero = _mm_setzero_si128();
@@ -446,29 +424,6 @@ void ts_extended_f32_to_bf16(uint16_t *out, const float *input, size_t n, int ro
                          _mm_packs_epi32(ts_f32_to_bf16_sse2(_mm_loadu_ps(input + i), rounding),
                                          ts_f32_to_bf16_sse2(_mm_loadu_ps(input + i + 4), rounding)));
     for (; i < n; ++i) out[i] = ts_f32_to_bf16_scalar(input[i], rounding);
-}
-/* H holds one zero-extended f16 per lane. Subnormals become normal floats
-   through an exact subtraction of 2^-14, so DAZ and FTZ cannot affect them. */
-static __m128 ts_f16_to_f32_sse2(__m128i h) {
-    const __m128i exponent_mask = _mm_set1_epi32(0x7c00 << 13);
-    const __m128i magic = _mm_set1_epi32(113 << 23);
-    __m128i magnitude = _mm_slli_epi32(_mm_and_si128(h, _mm_set1_epi32(0x7fff)), 13);
-    __m128i exponent = _mm_and_si128(magnitude, exponent_mask);
-    __m128i special = _mm_cmpeq_epi32(exponent, exponent_mask);
-    __m128i nan = _mm_cmpgt_epi32(magnitude, exponent_mask);
-    __m128i subnormal = _mm_cmpeq_epi32(exponent, _mm_setzero_si128());
-    __m128i bits = _mm_add_epi32(magnitude, _mm_set1_epi32(112 << 23));
-    bits = _mm_add_epi32(bits, _mm_and_si128(special, _mm_set1_epi32(112 << 23)));
-    bits = _mm_or_si128(bits, _mm_and_si128(nan, _mm_set1_epi32(0x400000)));
-    __m128i scaled = _mm_or_si128(_mm_and_si128(subnormal, _mm_add_epi32(magnitude, magic)),
-                                  _mm_andnot_si128(subnormal, magic));
-    __m128i small = _mm_castps_si128(_mm_sub_ps(_mm_castsi128_ps(scaled),
-                                                _mm_castsi128_ps(magic)));
-    /* Equal operands subtract to -0 under downward rounding. */
-    small = _mm_and_si128(small, _mm_set1_epi32(0x7fffffff));
-    bits = _mm_or_si128(_mm_and_si128(subnormal, small), _mm_andnot_si128(subnormal, bits));
-    __m128i sign = _mm_slli_epi32(_mm_and_si128(h, _mm_set1_epi32(0x8000)), 16);
-    return _mm_castsi128_ps(_mm_or_si128(bits, sign));
 }
 void ts_extended_f16_to_f32(float *out, const uint16_t *input, size_t n) {
     size_t i = 0;
