@@ -26,7 +26,8 @@
                (:file "kernel-rows")
                (:file "kernel-inputs")
                (:file "kernel-complex")
-               (:file "kernel-plan") (:file "product"))
+               (:file "kernel-plan") (:file "product")
+               (:file "q8"))
   :in-order-to ((asdf:test-op (asdf:test-op "trivial-simd/tests"))))
 
 (asdf:defsystem "trivial-simd/tests"
@@ -60,7 +61,8 @@
                (:file "tests/bulk-overlap")
                (:file "tests/kernel-inputs")
                (:file "tests/kernel-plans")
-               (:file "tests/complex-kernels"))
+               (:file "tests/complex-kernels")
+               (:file "tests/q8"))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
              (unless (uiop:symbol-call :trivial-simd/tests :run-tests)
