@@ -21,6 +21,7 @@ is.
 | `(fma! destination x y z &key ...)` | Fused elementwise `x*y+z` for floats |
 | [`copy!`, `fill!`, `swap!`](copy.md) | Copy, set or exchange slices of any numeric vector |
 | [Unary and bounded operations](elementwise.md) | Negate, absolute value, square root, reciprocal, min, max, clamp |
+| [`q8-0-matmul!`](q8-matmul.md) | Matrix product of f32 rows with Q8_0 weight blocks |
 | [`convert!`](conversion.md) | Convert among numeric vector types and bf16/f16 storage |
 | [Masks and selection](masks.md) | Compare, select, count, any, all |
 | [`sum`, `prod`, `dot`, `dotc`, `asum`, `nrm2`](reductions.md) | Scalar sum/product, dot product, absolute sum, Euclidean norm |

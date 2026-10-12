@@ -20,8 +20,17 @@
           ((= exponent 31) (error "Q8_0 scale is not finite"))
           (t (* sign (scale-float (coerce (+ 1024 fraction) 'double-float) (- exponent 25)))))))
 
+(defun lisp-vector (vector element-type)
+  "VECTOR, or a Lisp copy of it when it is a view."
+  (if (vector-view-p vector)
+      (copy! (make-array (vector-view-length vector) :element-type element-type) vector)
+      vector))
+
 (defun q8-0-matmul-lisp (out x blocks n m k x-stride out-stride)
-  (let ((block-count (floor k +q8-0-block-elements+)))
+  (let ((block-count (floor k +q8-0-block-elements+))
+        (x (lisp-vector x 'single-float))
+        (blocks (lisp-vector blocks '(unsigned-byte 8)))
+        (destination (lisp-vector out 'single-float)))
     (dotimes (j m)
       (dotimes (i n)
         (let ((sum 0d0))
@@ -34,7 +43,8 @@
                   (incf partial (* (aref x (+ (* i x-stride) (* b +q8-0-block-elements+) e))
                                    (if (< byte 128) byte (- byte 256))))))
               (incf sum (* partial scale))))
-          (setf (aref out (+ (* i out-stride) j)) (coerce sum 'single-float)))))))
+          (setf (aref destination (+ (* i out-stride) j)) (coerce sum 'single-float)))))
+    (unless (eq destination out) (copy! out destination))))
 
 (defun q8-0-matmul! (out x blocks n m k &key (x-stride k) (out-stride m))
   "Set row i, column j of the N x M matrix OUT to the dot product of row i of X and

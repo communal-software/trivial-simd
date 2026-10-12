@@ -52,6 +52,18 @@
         (is (q8-0-close-p (coerce (loop for i below (* n m) collect (simd::view-ref result i)) 'vector)
                           expected k))))))
 
+(test q8-0-matmul-lisp-fallback-reads-foreign-views
+  (let* ((n 2) (m 3) (k 64) (blocks (random-q8-0-blocks m k)) (x (random-floats (* n k)))
+         (expected (make-array (* n m) :element-type 'single-float)))
+    (simd::q8-0-matmul-lisp expected x blocks n m k k m)
+    (cffi:with-foreign-objects ((raw :uint8 (length blocks)) (out :float (* n m)))
+      (dotimes (i (length blocks)) (setf (cffi:mem-aref raw :uint8 i) (aref blocks i)))
+      (let ((result (simd:make-vector-view out :f32 (* n m)))
+            (simd::*native-q8-0-p* nil))
+        (simd:q8-0-matmul! result x (simd:make-vector-view raw :u8 (length blocks)) n m k)
+        (is (q8-0-close-p (coerce (loop for i below (* n m) collect (simd::view-ref result i)) 'vector)
+                          expected k))))))
+
 (test q8-0-matmul-handles-an-empty-product
   (let ((out (make-array 0 :element-type 'single-float)))
     (is (eq out (simd:q8-0-matmul! out (make-array 0 :element-type 'single-float)
