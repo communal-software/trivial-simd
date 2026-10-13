@@ -37,7 +37,8 @@ static unsigned ts_strided_memory_key(unsigned op, unsigned type, const int64_t 
 
 static int ts_strided_memory_enabled(unsigned op, unsigned type, size_t n, const int64_t *steps) {
     if (type > 1) return 0;
-#if defined(TS_SCALAR) || defined(TS_DISABLE_STRIDED_SPECIALIZATIONS)
+#if defined(TS_SCALAR) || defined(TS_DISABLE_STRIDED_SPECIALIZATIONS) || \
+    !(defined(__aarch64__) || defined(_M_ARM64) || defined(__x86_64__) || defined(_M_X64))
     (void)op; (void)type; (void)n; (void)steps; return 0;
 #elif defined(TS_STRIDED_MEMORY_TEST)
     (void)op; (void)type; (void)n; (void)steps; return strided_specialized;

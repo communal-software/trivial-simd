@@ -146,9 +146,10 @@
                                 (trivial-simd::vector-ref b i) (coerce (if (eq mode :alias) 1 2) type)
                                 (trivial-simd::vector-ref out i) (coerce 0 type)))
                         (dolist (offset '(0 1))
-                          (dolist (operation (if quick '(:add :sum :dot :axpy)
-                                                '(:add :add-scalar :subtract :multiply :divide :negate :abs :min :max
-                                                  :scale :axpy :fma :sum :dot :sum-wide :dot-wide)))
+                          (dolist (operation (cond ((uiop:getenv "TRIVIAL_SIMD_STRIDED_REDUCERS_ONLY") '(:sum :dot :sum-wide :dot-wide))
+                                                  (quick '(:add :sum :dot :axpy))
+                                                  (t '(:add :add-scalar :subtract :multiply :divide :negate :abs :min :max
+                                                  :scale :axpy :fma :sum :dot :sum-wide :dot-wide))))
                             (unless (and (eq type 'double-float) (member operation '(:sum-wide :dot-wide)))
                               (let ((seen nil))
                                 (dolist (layout '((-1 -1 -1 -1) (2 2 2 2) (-2 -2 -2 -2)
