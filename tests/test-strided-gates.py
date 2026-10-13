@@ -31,6 +31,22 @@ class AdmissionTests(unittest.TestCase):
         rows["f32", "add", (-1, -1, -1, 1), 65536, "view", 1, 1, "candidate"] = 120
         self.assertEqual(gates.admissions(rows, "candidate"), [])
 
+    def test_dispatch_cannot_admit_an_unmeasured_layout(self):
+        limits = gates.admissions(measurements(), "candidate")
+        phantom = (159, 256, "f32", "add", (-1, -1, 0, 1))
+        rows = {(*key[:-1], "dispatch" if key[-1] == "candidate" else key[-1]): value
+                for key, value in measurements().items()}
+        self.assertEqual(gates.validate_dispatch(rows, [phantom], limits), [])
+
+    def test_below_gate_regression_rejects_operation(self):
+        limits = gates.admissions(measurements(), "candidate")
+        rows = {(*key[:-1], "dispatch" if key[-1] == "candidate" else key[-1]): value
+                for key, value in measurements().items()}
+        for key in list(rows):
+            if key[3] == 16 and key[-1] == "dispatch":
+                rows[key] = 120
+        self.assertEqual(gates.validate_dispatch(rows, limits, limits), [])
+
     def test_missing_pair_fails_closed(self):
         rows = measurements()
         rows.pop(next(key for key in rows if key[-1] == "candidate"))

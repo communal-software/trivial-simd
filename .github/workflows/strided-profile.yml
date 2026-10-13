@@ -61,6 +61,7 @@ jobs:
       - name: Validate normal dispatch
         shell: lispsh -eo pipefail {0}
         run: |
+          python3 tests/strided-gates.py --json strided-profile/*.csv > strided-profile/candidate-limits.json
           python3 tests/strided-gates.py --lisp strided-profile/*.csv > strided-profile/candidate-cases.lisp
           python3 tests/strided-gates.py --header x86-64 strided-profile/*.csv > native/strided-memory-gates.h
           cp native/strided-memory-gates.h strided-profile/candidate-header.h
@@ -80,7 +81,7 @@ jobs:
                 ros -Q run --eval '(handler-case (load "tests/strided-bench.lisp") (error (condition) (format *error-output* "~A~%" condition) (uiop:quit 1)))'
               done
             done
-            python3 tests/strided-gates.py --variant dispatch --header x86-64 strided-profile/validation/*.csv > strided-profile/validated-header.h
+            python3 tests/strided-gates.py --variant dispatch --limits strided-profile/candidate-limits.json --header x86-64 strided-profile/validation/*.csv > strided-profile/validated-header.h
           else
             cp strided-profile/candidate-header.h strided-profile/validated-header.h
           fi

@@ -283,19 +283,20 @@ TS_STRIDED_REDUCE_LOAD(f64, double)
 #undef TS_f32_WIDTH
 #undef TS_f64_STORE
 #undef TS_f64_WIDTH
-#define TS_STRIDED_INTEGER_LOAD(suffix, type, width) \
-static void ts_strided_reduce_load_##suffix(type *out, const type *p, int64_t step, \
-                                            size_t remaining, size_t processed, int specialized) { \
-    (void)remaining; (void)processed; (void)specialized; \
-    ts_strided_load(out, p, step, sizeof(type), width); \
-}
-TS_STRIDED_INTEGER_LOAD(s8, int8_t, 16) TS_STRIDED_INTEGER_LOAD(u8, uint8_t, 16)
-TS_STRIDED_INTEGER_LOAD(s16, int16_t, 8) TS_STRIDED_INTEGER_LOAD(u16, uint16_t, 8)
-TS_STRIDED_INTEGER_LOAD(s32, int32_t, 4) TS_STRIDED_INTEGER_LOAD(u32, uint32_t, 4)
-TS_STRIDED_INTEGER_LOAD(s64, int64_t, 2) TS_STRIDED_INTEGER_LOAD(u64, uint64_t, 2)
-#undef TS_STRIDED_INTEGER_LOAD
+#define TS_STRIDED_REDUCE_LOAD_GENERAL(suffix, out, input, step, bytes, width, remaining, processed) \
+    ts_strided_load(out, input, step, bytes, width)
+#define TS_STRIDED_REDUCE_LOAD_PACKED(suffix, out, input, step, bytes, width, remaining, processed) \
+    ts_strided_reduce_load_##suffix(out, input, step, remaining, processed, 1)
+#define TS_STRIDED_WIDE_LOAD_GENERAL(a, b, start, as, bs)
+#define TS_STRIDED_WIDE_LOAD_PACKED(a, b, start, as, bs) \
+    float packed_x[4], packed_y[4]; \
+    TS_F32_STORE(packed_x, ts_strided_load_f32((const float *)a + (int64_t)start * as, as, n - start, start, 1, 1)); \
+    if (op == TS_STRIDED_DOT) \
+        TS_F32_STORE(packed_y, ts_strided_load_f32((const float *)b + (int64_t)start * bs, bs, n - start, start, 1, 1));
+#define TS_STRIDED_WIDE_VALUE_GENERAL(input, start, lane, step, packed) input[(int64_t)(start + lane) * step]
+#define TS_STRIDED_WIDE_VALUE_PACKED(input, start, lane, step, packed) packed[lane]
 
-#define TS_STRIDED_REDUCE(suffix, type, bits_type, width, binary, abs_value, less, greater, function, selected) \
+#define TS_STRIDED_REDUCE(suffix, type, bits_type, width, binary, abs_value, less, greater, function, mode) \
 static int function(unsigned op, const type *a, const type *b, size_t n, \
                                       int64_t as, int64_t bs, void *result, double *wide_result, \
                                       uint64_t *index, int wide) { \
@@ -303,7 +304,6 @@ static int function(unsigned op, const type *a, const type *b, size_t n, \
     type lanes[width], x[width], y[width], best = 0; \
     double wide_lanes[4] = {0}; \
     size_t winning = 0, start = 0; \
-    int specialized = selected && (op == TS_STRIDED_SUM || op == TS_STRIDED_DOT); \
     for (size_t j = 0; j < width; ++j) lanes[j] = op == TS_STRIDED_PROD ? 1 : 0; \
     if (op >= TS_STRIDED_ARGMIN) { \
         if (!n) { *index = 0; return 0; } \
@@ -328,15 +328,10 @@ static int function(unsigned op, const type *a, const type *b, size_t n, \
     if (wide) { \
         for (; n - start >= 4; start += 4) { \
             double wx[4], wy[4]; \
-            float packed_x[4], packed_y[4]; \
-            if (specialized) { \
-                TS_F32_STORE(packed_x, ts_strided_load_f32((const float *)a + (int64_t)start * as, as, n - start, start, 1, 1)); \
-                if (op == TS_STRIDED_DOT) \
-                    TS_F32_STORE(packed_y, ts_strided_load_f32((const float *)b + (int64_t)start * bs, bs, n - start, start, 1, 1)); \
-            } \
+            TS_STRIDED_WIDE_LOAD_##mode(a, b, start, as, bs) \
             for (size_t j = 0; j < 4; ++j) { \
-                wx[j] = specialized ? packed_x[j] : a[(int64_t)(start + j) * as]; \
-                if (op == TS_STRIDED_DOT) wy[j] = specialized ? packed_y[j] : b[(int64_t)(start + j) * bs]; \
+                wx[j] = TS_STRIDED_WIDE_VALUE_##mode(a, start, j, as, packed_x); \
+                if (op == TS_STRIDED_DOT) wy[j] = TS_STRIDED_WIDE_VALUE_##mode(b, start, j, bs, packed_y); \
                 else if (op == TS_STRIDED_ASUM) wx[j] = fabs(wx[j]); \
             } \
             if (op == TS_STRIDED_DOT) ts_strided_binary_f64(TS_OP_MULTIPLY, wx, wx, wy, 0, 0, 4); \
@@ -352,9 +347,9 @@ static int function(unsigned op, const type *a, const type *b, size_t n, \
         *wide_result = total; return 0; \
     } \
     for (; n - start >= width; start += width) { \
-        ts_strided_reduce_load_##suffix(x, a + (int64_t)start * as, as, n - start, start, specialized); \
+        TS_STRIDED_REDUCE_LOAD_##mode(suffix, x, a + (int64_t)start * as, as, sizeof(type), width, n - start, start); \
         if (op == TS_STRIDED_DOT) { \
-            ts_strided_reduce_load_##suffix(y, b + (int64_t)start * bs, bs, n - start, start, specialized); \
+            TS_STRIDED_REDUCE_LOAD_##mode(suffix, y, b + (int64_t)start * bs, bs, sizeof(type), width, n - start, start); \
             binary(TS_OP_MULTIPLY, (bits_type *)x, (const bits_type *)x, (const bits_type *)y, 0, 0, width); \
         } else if (op == TS_STRIDED_ASUM) { \
             void *p[] = {x, x, NULL, NULL}; ts_strided_extended_##suffix(TS_ND_ABS, p, width); \
@@ -376,9 +371,23 @@ static int function(unsigned op, const type *a, const type *b, size_t n, \
     } \
     memcpy(result, &value, sizeof value); return 0; \
 }
+/* Keep fallback stack frames independent of dispatch-wrapper inlining. */
+#if defined(_MSC_VER)
+#define TS_REDUCER_FRAME __declspec(noinline)
+#else
+#define TS_REDUCER_FRAME __attribute__((noinline))
+#endif
+#define TS_STRIDED_GENERAL_REDUCER(suffix, type) \
+static TS_REDUCER_FRAME int ts_strided_reduce_##suffix##_general(unsigned, const type *, const type *, size_t, \
+                                                                 int64_t, int64_t, void *, double *, uint64_t *, int);
+TS_STRIDED_GENERAL_REDUCER(f32, float)
+TS_STRIDED_GENERAL_REDUCER(f64, double)
+#undef TS_STRIDED_GENERAL_REDUCER
+#undef TS_REDUCER_FRAME
+
 #define TS_STRIDED_FLOAT_REDUCE(suffix, type, width, binary, absolute, less, greater) \
-    TS_STRIDED_REDUCE(suffix, type, type, width, binary, absolute, less, greater, ts_strided_reduce_##suffix##_general, 0) \
-    TS_STRIDED_REDUCE(suffix, type, type, width, binary, absolute, less, greater, ts_strided_reduce_##suffix##_packed, 1) \
+    TS_STRIDED_REDUCE(suffix, type, type, width, binary, absolute, less, greater, ts_strided_reduce_##suffix##_general, GENERAL) \
+    TS_STRIDED_REDUCE(suffix, type, type, width, binary, absolute, less, greater, ts_strided_reduce_##suffix##_packed, PACKED) \
 static int ts_strided_reduce_##suffix(unsigned op, const type *a, const type *b, size_t n, \
                                       int64_t as, int64_t bs, void *result, double *wide_result, \
                                       uint64_t *index, int wide) { \
@@ -391,15 +400,21 @@ static int ts_strided_reduce_##suffix(unsigned op, const type *a, const type *b,
 TS_STRIDED_FLOAT_REDUCE(f32, float, TS_F32_WIDTH, ts_strided_binary_f32, fabsf, ts_reduce_less_f32, ts_reduce_greater_f32)
 TS_STRIDED_FLOAT_REDUCE(f64, double, TS_F64_WIDTH, ts_strided_binary_f64, fabs, ts_reduce_less_f64, ts_reduce_greater_f64)
 #undef TS_STRIDED_FLOAT_REDUCE
-TS_STRIDED_REDUCE(s8, int8_t, uint8_t, 16, ts_strided_binary_s8, ts_reduce_abs_s8, ts_reduce_less_s8, ts_reduce_greater_s8, ts_strided_reduce_s8, 0)
-TS_STRIDED_REDUCE(u8, uint8_t, uint8_t, 16, ts_strided_binary_u8, ts_reduce_abs_u8, ts_reduce_less_u8, ts_reduce_greater_u8, ts_strided_reduce_u8, 0)
-TS_STRIDED_REDUCE(s16, int16_t, uint16_t, 8, ts_strided_binary_s16, ts_reduce_abs_s16, ts_reduce_less_s16, ts_reduce_greater_s16, ts_strided_reduce_s16, 0)
-TS_STRIDED_REDUCE(u16, uint16_t, uint16_t, 8, ts_strided_binary_u16, ts_reduce_abs_u16, ts_reduce_less_u16, ts_reduce_greater_u16, ts_strided_reduce_u16, 0)
-TS_STRIDED_REDUCE(s32, int32_t, uint32_t, 4, ts_strided_binary_s32, ts_reduce_abs_s32, ts_reduce_less_s32, ts_reduce_greater_s32, ts_strided_reduce_s32, 0)
-TS_STRIDED_REDUCE(u32, uint32_t, uint32_t, 4, ts_strided_binary_u32, ts_reduce_abs_u32, ts_reduce_less_u32, ts_reduce_greater_u32, ts_strided_reduce_u32, 0)
-TS_STRIDED_REDUCE(s64, int64_t, uint64_t, 2, ts_strided_binary_s64, ts_reduce_abs_s64, ts_reduce_less_s64, ts_reduce_greater_s64, ts_strided_reduce_s64, 0)
-TS_STRIDED_REDUCE(u64, uint64_t, uint64_t, 2, ts_strided_binary_u64, ts_reduce_abs_u64, ts_reduce_less_u64, ts_reduce_greater_u64, ts_strided_reduce_u64, 0)
+TS_STRIDED_REDUCE(s8, int8_t, uint8_t, 16, ts_strided_binary_s8, ts_reduce_abs_s8, ts_reduce_less_s8, ts_reduce_greater_s8, ts_strided_reduce_s8, GENERAL)
+TS_STRIDED_REDUCE(u8, uint8_t, uint8_t, 16, ts_strided_binary_u8, ts_reduce_abs_u8, ts_reduce_less_u8, ts_reduce_greater_u8, ts_strided_reduce_u8, GENERAL)
+TS_STRIDED_REDUCE(s16, int16_t, uint16_t, 8, ts_strided_binary_s16, ts_reduce_abs_s16, ts_reduce_less_s16, ts_reduce_greater_s16, ts_strided_reduce_s16, GENERAL)
+TS_STRIDED_REDUCE(u16, uint16_t, uint16_t, 8, ts_strided_binary_u16, ts_reduce_abs_u16, ts_reduce_less_u16, ts_reduce_greater_u16, ts_strided_reduce_u16, GENERAL)
+TS_STRIDED_REDUCE(s32, int32_t, uint32_t, 4, ts_strided_binary_s32, ts_reduce_abs_s32, ts_reduce_less_s32, ts_reduce_greater_s32, ts_strided_reduce_s32, GENERAL)
+TS_STRIDED_REDUCE(u32, uint32_t, uint32_t, 4, ts_strided_binary_u32, ts_reduce_abs_u32, ts_reduce_less_u32, ts_reduce_greater_u32, ts_strided_reduce_u32, GENERAL)
+TS_STRIDED_REDUCE(s64, int64_t, uint64_t, 2, ts_strided_binary_s64, ts_reduce_abs_s64, ts_reduce_less_s64, ts_reduce_greater_s64, ts_strided_reduce_s64, GENERAL)
+TS_STRIDED_REDUCE(u64, uint64_t, uint64_t, 2, ts_strided_binary_u64, ts_reduce_abs_u64, ts_reduce_less_u64, ts_reduce_greater_u64, ts_strided_reduce_u64, GENERAL)
 #undef TS_STRIDED_REDUCE
+#undef TS_STRIDED_REDUCE_LOAD_GENERAL
+#undef TS_STRIDED_REDUCE_LOAD_PACKED
+#undef TS_STRIDED_WIDE_LOAD_GENERAL
+#undef TS_STRIDED_WIDE_LOAD_PACKED
+#undef TS_STRIDED_WIDE_VALUE_GENERAL
+#undef TS_STRIDED_WIDE_VALUE_PACKED
 
 
 #define TS_STRIDED_NORM(suffix, type) \
