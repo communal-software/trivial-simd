@@ -1,0 +1,62 @@
+name: Strided profile
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [profile/strided-memory]
+    paths:
+      - 'native/**'
+      - 'tests/strided*'
+      - 'tests/native-strided.c'
+      - 'CMakeLists.txt'
+      - '.github/workflows/strided-profile.yml'
+
+concurrency:
+  group: strided-profile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  profile:
+    name: SBCL / native x86-64
+    runs-on: ubuntu-latest
+    env:
+      LISP: sbcl-bin
+      TRIVIAL_SIMD_BACKEND: native
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_STRIDED_PROFILE=ON
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+      - uses: 40ants/setup-lisp@v4
+        with:
+          asdf-system: trivial-simd
+          cache: false
+      - name: Check Lisp
+        shell: lispsh -eo pipefail {0}
+        run: |
+          ros config set dynamic-space-size 4GB
+          ros -Q run --load tests/run.lisp
+      - name: Measurements
+        shell: lispsh -eo pipefail {0}
+        run: |
+          mkdir -p strided-profile
+          lscpu > strided-profile/machine.txt
+          cc --version >> strided-profile/machine.txt
+          export TRIVIAL_SIMD_STRIDED_PROFILE=1
+          for trial in 0 1 2 3 4; do
+            export TRIVIAL_SIMD_STRIDED_TRIAL=$trial
+            variants="general candidate"
+            if [ $((trial % 2)) -eq 1 ]; then variants="candidate general"; fi
+            for variant in $variants; do
+              export TRIVIAL_SIMD_STRIDED_VARIANT=$variant
+              export TRIVIAL_SIMD_STRIDED_OUTPUT="strided-profile/$variant-$trial.csv"
+              ros -Q run --eval '(load "tests/strided-bench.lisp")'
+            done
+          done
+          python3 tests/strided-gates.py strided-profile/*.csv > strided-profile/candidate-gates.h
+      - uses: actions/upload-artifact@v4
+        with:
+          name: strided-profile-x86-64
+          path: strided-profile

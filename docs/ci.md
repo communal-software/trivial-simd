@@ -91,3 +91,16 @@ lifetime-stress overhead is tracked in
     `kernel-sharing.lisp`, or `CMakeLists.txt`. The path lists are in the
     `paths` section of the matrix file.
 [^cost]: GitHub's current rates are in its Actions billing documentation.
+
+## Strided profile
+
+The **Strided profile** workflow runs manually or on native/profiler changes to
+`profile/strided-memory`. It checks C and Lisp correctness on x86-64 Linux and
+runs five paired general/specialized complete-call trials. The artifact contains
+CSV timings, candidate gate initializers and CPU/compiler details.
+
+```sh
+gh workflow run strided-profile.yml
+```
+
+See [strided profiling](strided-performance.md#memory-path-profiling).

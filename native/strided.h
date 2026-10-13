@@ -114,39 +114,37 @@ TS_STRIDED_ROW(u64, uint64_t, ts_strided_binary_u64)
 #undef TS_STRIDED_INTEGER_EXTENDED
 
 
-/* TODO: scalar memory lanes cap common strides; specialize reversed/deinterleaved transfers (#77). */
-#define TS_STRIDED_FLOAT(suffix, type, width, vector, load, store, splat, add, sub, mul, div, neg, absv, minv, maxv, fused) \
-static vector ts_strided_load_##suffix(const type *p, int64_t step) { \
-    if (step == 1) return load(p); \
-    if (!step) return splat(*p); \
-    type values[width]; \
-    for (size_t j = 0; j < width; ++j) values[j] = p[(int64_t)j * step]; \
-    return load(values); \
-} \
-static void ts_strided_store_##suffix(type *p, int64_t step, vector value) { \
-    if (step == 1) { store(p, value); return; } \
-    type values[width]; store(values, value); \
-    for (size_t j = 0; j < width; ++j) p[(int64_t)j * step] = values[j]; \
-} \
-static int ts_strided_float_##suffix(unsigned op, void *const *p, const int64_t *s, size_t n) { \
-    type *out = p[0]; const type *a = p[1], *b = p[2], *c = p[3]; size_t i = 0; \
+#include "strided-memory.h"
+
+#define TS_STRIDED_INPUT(suffix, pointer, step, safe) \
+    ts_strided_load_##suffix(pointer + (int64_t)i * step, step, n - i, i, specialized, safe)
+#define TS_STRIDED_FLOAT_LOOP(suffix, width, vector, expression) \
     for (; n - i >= width; i += width) { \
-        vector x = ts_strided_load_##suffix(a + (int64_t)i * s[1], s[1]), result; \
-        if (op == TS_ND_NEGATE) result = neg(x); \
-        else if (op == TS_ND_ABS) result = absv(x); \
-        else if (op == TS_STRIDED_SCALE) result = mul(ts_strided_load_##suffix(out + (int64_t)i * s[0], s[0]), x); \
-        else { \
-            vector y = ts_strided_load_##suffix(b + (int64_t)i * s[2], s[2]); \
-            if (op == TS_ND_ADD) result = add(x, y); \
-            else if (op == TS_ND_SUBTRACT) result = sub(x, y); \
-            else if (op == TS_ND_MULTIPLY) result = mul(x, y); \
-            else if (op == TS_ND_DIVIDE) result = div(x, y); \
-            else if (op == TS_ND_MIN) result = minv(x, y); \
-            else if (op == TS_ND_MAX) result = maxv(x, y); \
-            else if (op == TS_STRIDED_AXPY) result = add(mul(x, y), ts_strided_load_##suffix(out + (int64_t)i * s[0], s[0])); \
-            else result = fused(x, y, ts_strided_load_##suffix(c + (int64_t)i * s[3], s[3])); \
-        } \
-        ts_strided_store_##suffix(out + (int64_t)i * s[0], s[0], result); \
+        vector result = expression; \
+        ts_strided_store_##suffix(out + (int64_t)i * s[0], s[0], result, specialized); \
+    }
+
+#define TS_STRIDED_FLOAT(suffix, type, width, vector, load, store, splat, add, sub, mul, div, neg, absv, minv, maxv, fused, mode, selected) \
+static int ts_strided_float_##suffix##_##mode(unsigned op, void *const *p, const int64_t *s, size_t n) { \
+    type *out = p[0]; const type *a = p[1], *b = p[2], *c = p[3]; size_t i = 0; \
+    const int specialized = selected; \
+    int64_t steps[] = {s[0], s[1], s[2], s[3]}; s = steps; \
+    int safe_a = specialized && ts_strided_memory_disjoint(a, s[1], out, s[0], sizeof(type), n); \
+    int safe_b = specialized && ts_strided_memory_disjoint(b, s[2], out, s[0], sizeof(type), n); \
+    int safe_c = specialized && ts_strided_memory_disjoint(c, s[3], out, s[0], sizeof(type), n); \
+    switch (op) { \
+    case TS_ND_ADD: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, add(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b))); break; \
+    case TS_ND_SUBTRACT: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, sub(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b))); break; \
+    case TS_ND_MULTIPLY: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, mul(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b))); break; \
+    case TS_ND_DIVIDE: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, div(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b))); break; \
+    case TS_ND_NEGATE: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, neg(TS_STRIDED_INPUT(suffix, a, s[1], safe_a))); break; \
+    case TS_ND_ABS: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, absv(TS_STRIDED_INPUT(suffix, a, s[1], safe_a))); break; \
+    case TS_ND_MIN: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, minv(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b))); break; \
+    case TS_ND_MAX: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, maxv(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b))); break; \
+    case TS_STRIDED_SCALE: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, mul(TS_STRIDED_INPUT(suffix, out, s[0], 0), TS_STRIDED_INPUT(suffix, a, s[1], safe_a))); break; \
+    case TS_STRIDED_AXPY: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, add(mul(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b)), TS_STRIDED_INPUT(suffix, out, s[0], 0))); break; \
+    case TS_STRIDED_FMA: TS_STRIDED_FLOAT_LOOP(suffix, width, vector, fused(TS_STRIDED_INPUT(suffix, a, s[1], safe_a), TS_STRIDED_INPUT(suffix, b, s[2], safe_b), TS_STRIDED_INPUT(suffix, c, s[3], safe_c))); break; \
+    default: return -1; \
     } \
     if (i < n) { \
         type values[4][width]; void *q[4] = {values[0], values[1], values[2], values[3]}; \
@@ -162,11 +160,22 @@ static int ts_strided_float_##suffix(unsigned op, void *const *p, const int64_t 
     } \
     return 0; \
 }
-TS_STRIDED_FLOAT(f32, float, TS_F32_WIDTH, TS_F32_VECTOR, TS_F32_LOAD, TS_F32_STORE, TS_F32_SPLAT,
+#define TS_STRIDED_FLOAT_TYPE(suffix, type, width, vector, load, store, splat, add, sub, mul, div, neg, absv, minv, maxv, fused) \
+    TS_STRIDED_FLOAT(suffix, type, width, vector, load, store, splat, add, sub, mul, div, neg, absv, minv, maxv, fused, general, 0) \
+    TS_STRIDED_FLOAT(suffix, type, width, vector, load, store, splat, add, sub, mul, div, neg, absv, minv, maxv, fused, packed, 1) \
+static int ts_strided_float_##suffix(unsigned op, void *const *p, const int64_t *s, size_t n) { \
+    if (ts_strided_memory_enabled(op, sizeof(type) == 8, n, s)) \
+        return ts_strided_float_##suffix##_packed(op, p, s, n); \
+    return ts_strided_float_##suffix##_general(op, p, s, n); \
+}
+TS_STRIDED_FLOAT_TYPE(f32, float, TS_F32_WIDTH, TS_F32_VECTOR, TS_F32_LOAD, TS_F32_STORE, TS_F32_SPLAT,
                  TS_F32_ADD, TS_F32_SUB, TS_F32_MUL, TS_F32_DIV, TS_F32_NEGATE, TS_F32_ABS, TS_F32_MIN, TS_F32_MAX, TS_F32_FMA)
-TS_STRIDED_FLOAT(f64, double, TS_F64_WIDTH, TS_F64_VECTOR, TS_F64_LOAD, TS_F64_STORE, TS_F64_SPLAT,
+TS_STRIDED_FLOAT_TYPE(f64, double, TS_F64_WIDTH, TS_F64_VECTOR, TS_F64_LOAD, TS_F64_STORE, TS_F64_SPLAT,
                  TS_F64_ADD, TS_F64_SUB, TS_F64_MUL, TS_F64_DIV, TS_F64_NEGATE, TS_F64_ABS, TS_F64_MIN, TS_F64_MAX, TS_F64_FMA)
+#undef TS_STRIDED_FLOAT_TYPE
 #undef TS_STRIDED_FLOAT
+#undef TS_STRIDED_FLOAT_LOOP
+#undef TS_STRIDED_INPUT
 
 uint64_t ts_strided_mask_reduce(unsigned, const uint8_t *, size_t, int64_t);
 int ts_extended_conversion_supported(unsigned, unsigned);
@@ -257,7 +266,31 @@ int ts_strided_execute(unsigned op, unsigned type, unsigned destination_type, un
     return 0;
 }
 
-#define TS_STRIDED_REDUCE(suffix, type, bits_type, width, binary, abs_value, less, greater) \
+#define TS_STRIDED_REDUCE_LOAD(suffix, type) \
+static void ts_strided_reduce_load_##suffix(type *out, const type *p, int64_t step, \
+                                            size_t remaining, size_t processed, int specialized) { \
+    TS_##suffix##_STORE(out, ts_strided_load_##suffix(p, step, remaining, processed, specialized, 1)); \
+}
+#define TS_f32_STORE TS_F32_STORE
+#define TS_f64_STORE TS_F64_STORE
+TS_STRIDED_REDUCE_LOAD(f32, float)
+TS_STRIDED_REDUCE_LOAD(f64, double)
+#undef TS_STRIDED_REDUCE_LOAD
+#undef TS_f32_STORE
+#undef TS_f64_STORE
+#define TS_STRIDED_INTEGER_LOAD(suffix, type, width) \
+static void ts_strided_reduce_load_##suffix(type *out, const type *p, int64_t step, \
+                                            size_t remaining, size_t processed, int specialized) { \
+    (void)remaining; (void)processed; (void)specialized; \
+    ts_strided_load(out, p, step, sizeof(type), width); \
+}
+TS_STRIDED_INTEGER_LOAD(s8, int8_t, 16) TS_STRIDED_INTEGER_LOAD(u8, uint8_t, 16)
+TS_STRIDED_INTEGER_LOAD(s16, int16_t, 8) TS_STRIDED_INTEGER_LOAD(u16, uint16_t, 8)
+TS_STRIDED_INTEGER_LOAD(s32, int32_t, 4) TS_STRIDED_INTEGER_LOAD(u32, uint32_t, 4)
+TS_STRIDED_INTEGER_LOAD(s64, int64_t, 2) TS_STRIDED_INTEGER_LOAD(u64, uint64_t, 2)
+#undef TS_STRIDED_INTEGER_LOAD
+
+#define TS_STRIDED_REDUCE(suffix, type, bits_type, width, binary, abs_value, less, greater, memory_type) \
 static int ts_strided_reduce_##suffix(unsigned op, const type *a, const type *b, size_t n, \
                                       int64_t as, int64_t bs, void *result, double *wide_result, \
                                       uint64_t *index, int wide) { \
@@ -265,6 +298,9 @@ static int ts_strided_reduce_##suffix(unsigned op, const type *a, const type *b,
     type lanes[width], x[width], y[width], best = 0; \
     double wide_lanes[4] = {0}; \
     size_t winning = 0, start = 0; \
+    int64_t memory_steps[] = {1, as, op == TS_STRIDED_DOT ? bs : 1, 1}; \
+    int specialized = (op == TS_STRIDED_SUM || op == TS_STRIDED_DOT) && \
+        ts_strided_memory_enabled(32 + op + (wide ? 64 : 0), memory_type, n, memory_steps); \
     for (size_t j = 0; j < width; ++j) lanes[j] = op == TS_STRIDED_PROD ? 1 : 0; \
     if (op >= TS_STRIDED_ARGMIN) { \
         if (!n) { *index = 0; return 0; } \
@@ -289,9 +325,15 @@ static int ts_strided_reduce_##suffix(unsigned op, const type *a, const type *b,
     if (wide) { \
         for (; n - start >= 4; start += 4) { \
             double wx[4], wy[4]; \
+            float packed_x[4], packed_y[4]; \
+            if (specialized) { \
+                TS_F32_STORE(packed_x, ts_strided_load_f32((const float *)a + (int64_t)start * as, as, n - start, start, 1, 1)); \
+                if (op == TS_STRIDED_DOT) \
+                    TS_F32_STORE(packed_y, ts_strided_load_f32((const float *)b + (int64_t)start * bs, bs, n - start, start, 1, 1)); \
+            } \
             for (size_t j = 0; j < 4; ++j) { \
-                wx[j] = a[(int64_t)(start + j) * as]; \
-                if (op == TS_STRIDED_DOT) wy[j] = b[(int64_t)(start + j) * bs]; \
+                wx[j] = specialized ? packed_x[j] : a[(int64_t)(start + j) * as]; \
+                if (op == TS_STRIDED_DOT) wy[j] = specialized ? packed_y[j] : b[(int64_t)(start + j) * bs]; \
                 else if (op == TS_STRIDED_ASUM) wx[j] = fabs(wx[j]); \
             } \
             if (op == TS_STRIDED_DOT) ts_strided_binary_f64(TS_OP_MULTIPLY, wx, wx, wy, 0, 0, 4); \
@@ -307,9 +349,9 @@ static int ts_strided_reduce_##suffix(unsigned op, const type *a, const type *b,
         *wide_result = total; return 0; \
     } \
     for (; n - start >= width; start += width) { \
-        ts_strided_load(x, a + (int64_t)start * as, as, sizeof(type), width); \
+        ts_strided_reduce_load_##suffix(x, a + (int64_t)start * as, as, n - start, start, specialized); \
         if (op == TS_STRIDED_DOT) { \
-            ts_strided_load(y, b + (int64_t)start * bs, bs, sizeof(type), width); \
+            ts_strided_reduce_load_##suffix(y, b + (int64_t)start * bs, bs, n - start, start, specialized); \
             binary(TS_OP_MULTIPLY, (bits_type *)x, (const bits_type *)x, (const bits_type *)y, 0, 0, width); \
         } else if (op == TS_STRIDED_ASUM) { \
             void *p[] = {x, x, NULL, NULL}; ts_strided_extended_##suffix(TS_ND_ABS, p, width); \
@@ -331,16 +373,16 @@ static int ts_strided_reduce_##suffix(unsigned op, const type *a, const type *b,
     } \
     memcpy(result, &value, sizeof value); return 0; \
 }
-TS_STRIDED_REDUCE(f32, float, float, TS_F32_WIDTH, ts_strided_binary_f32, fabsf, ts_reduce_less_f32, ts_reduce_greater_f32)
-TS_STRIDED_REDUCE(f64, double, double, TS_F64_WIDTH, ts_strided_binary_f64, fabs, ts_reduce_less_f64, ts_reduce_greater_f64)
-TS_STRIDED_REDUCE(s8, int8_t, uint8_t, 16, ts_strided_binary_s8, ts_reduce_abs_s8, ts_reduce_less_s8, ts_reduce_greater_s8)
-TS_STRIDED_REDUCE(u8, uint8_t, uint8_t, 16, ts_strided_binary_u8, ts_reduce_abs_u8, ts_reduce_less_u8, ts_reduce_greater_u8)
-TS_STRIDED_REDUCE(s16, int16_t, uint16_t, 8, ts_strided_binary_s16, ts_reduce_abs_s16, ts_reduce_less_s16, ts_reduce_greater_s16)
-TS_STRIDED_REDUCE(u16, uint16_t, uint16_t, 8, ts_strided_binary_u16, ts_reduce_abs_u16, ts_reduce_less_u16, ts_reduce_greater_u16)
-TS_STRIDED_REDUCE(s32, int32_t, uint32_t, 4, ts_strided_binary_s32, ts_reduce_abs_s32, ts_reduce_less_s32, ts_reduce_greater_s32)
-TS_STRIDED_REDUCE(u32, uint32_t, uint32_t, 4, ts_strided_binary_u32, ts_reduce_abs_u32, ts_reduce_less_u32, ts_reduce_greater_u32)
-TS_STRIDED_REDUCE(s64, int64_t, uint64_t, 2, ts_strided_binary_s64, ts_reduce_abs_s64, ts_reduce_less_s64, ts_reduce_greater_s64)
-TS_STRIDED_REDUCE(u64, uint64_t, uint64_t, 2, ts_strided_binary_u64, ts_reduce_abs_u64, ts_reduce_less_u64, ts_reduce_greater_u64)
+TS_STRIDED_REDUCE(f32, float, float, TS_F32_WIDTH, ts_strided_binary_f32, fabsf, ts_reduce_less_f32, ts_reduce_greater_f32, 0)
+TS_STRIDED_REDUCE(f64, double, double, TS_F64_WIDTH, ts_strided_binary_f64, fabs, ts_reduce_less_f64, ts_reduce_greater_f64, 1)
+TS_STRIDED_REDUCE(s8, int8_t, uint8_t, 16, ts_strided_binary_s8, ts_reduce_abs_s8, ts_reduce_less_s8, ts_reduce_greater_s8, 2)
+TS_STRIDED_REDUCE(u8, uint8_t, uint8_t, 16, ts_strided_binary_u8, ts_reduce_abs_u8, ts_reduce_less_u8, ts_reduce_greater_u8, 2)
+TS_STRIDED_REDUCE(s16, int16_t, uint16_t, 8, ts_strided_binary_s16, ts_reduce_abs_s16, ts_reduce_less_s16, ts_reduce_greater_s16, 2)
+TS_STRIDED_REDUCE(u16, uint16_t, uint16_t, 8, ts_strided_binary_u16, ts_reduce_abs_u16, ts_reduce_less_u16, ts_reduce_greater_u16, 2)
+TS_STRIDED_REDUCE(s32, int32_t, uint32_t, 4, ts_strided_binary_s32, ts_reduce_abs_s32, ts_reduce_less_s32, ts_reduce_greater_s32, 2)
+TS_STRIDED_REDUCE(u32, uint32_t, uint32_t, 4, ts_strided_binary_u32, ts_reduce_abs_u32, ts_reduce_less_u32, ts_reduce_greater_u32, 2)
+TS_STRIDED_REDUCE(s64, int64_t, uint64_t, 2, ts_strided_binary_s64, ts_reduce_abs_s64, ts_reduce_less_s64, ts_reduce_greater_s64, 2)
+TS_STRIDED_REDUCE(u64, uint64_t, uint64_t, 2, ts_strided_binary_u64, ts_reduce_abs_u64, ts_reduce_less_u64, ts_reduce_greater_u64, 2)
 #undef TS_STRIDED_REDUCE
 
 

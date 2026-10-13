@@ -16,6 +16,9 @@ conversions. Required [overlap snapshots](api.md#overlap) remain.
 Unit-stride calls use their existing paths. Signed strides retain the
 [logical-count and physical-index rules](api.md#strides). Native arithmetic
 uses NEON/SSE2 packs; general strides assemble and scatter their lanes directly.
+Experimental float memory paths use packed reverse transfers and bounded
+stride-two deinterleaving loads. Production dispatch admits only measured
+architecture/type/operation/layout combinations.[^memory]
 Scratch storage stays bounded independently of the element count.[^packs]
 
 Native strided integer operations pack wrapping arithmetic, bounded arithmetic,
@@ -68,10 +71,32 @@ The quick run measures stride-two sum/add at both sizes and access modes.
 The [testing guide](testing.md) describes scalar/SIMD C harnesses and the Lisp
 checks for pack boundaries, aliases, capability fallback, and absence of staging.
 
+## Memory-path profiling
+
+Build general and forced-specialized libraries, then run five paired trials:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_STRIDED_PROFILE=ON
+cmake --build build
+sh tests/strided-profile.sh /tmp/strided-profile
+python3 tests/strided-gates.py /tmp/strided-profile/*.csv
+```
+
+The profiler compares complete f32/f64 arithmetic and sum/dot calls, including
+widened f32 accumulation. It measures strides -1 and ±2, mixed layouts, scalar
+broadcasts, offsets, pointer/copy/view access and contiguous/general controls.
+The gathered baseline remains available through the original benchmark.
+
+Admission requires at least 10% median gain and at least 10% gain in four of
+five paired trials at the threshold and every larger measured size, for both
+pointer and foreign-view access where measured. Unqualified layouts retain
+general execution. Final dispatch measurements include gate lookup.
+
 ## Limitations
 
-- Common strides use general memory-lane assembly; specialized reverse and
-  deinterleaved transfers are tracked by
+- Specialized float transfers require complete-call admission on each
+  architecture. Other types and unqualified layouts use general memory-lane
+  assembly; measurement and activation are tracked by
   [#77](https://github.com/communal-software/trivial-simd/issues/77).
 - Non-native backends retain gathering or view staging for non-unit strides.
 - Integer division and exact conversions unsupported by native packs use scalar
@@ -95,3 +120,10 @@ checks for pack boundaries, aliases, capability fallback, and absence of staging
     granularity. The benchmark temporarily disables direct dispatch for its
     baseline and restores it after each batch. Floating-point reducers retain
     their documented backend-dependent accumulation order.
+
+[^memory]: Reverse transfers preserve logical lane order. Stride-two loads read
+    gaps only inside the validated span; final positive packs and first negative
+    packs use lane assembly when needed. Destination reads and inputs sharing the
+    destination's physical span use individual stride-two loads. Stores write only visited elements,
+    preserving concurrent updates to disjoint interleaved slices. Scalar tails,
+    snapshots and reduction accumulation order are unchanged.

@@ -49,11 +49,14 @@ plainly gathered copies for strides 1, 2, 3 and negative values on every
 backend, and cover bounds, empty slices, scalar operands and aliased outputs.
 Native stride tests cover every numeric type, pack boundaries through 257 elements,
 pointer/copy modes, missing capabilities, result types, unused large strides,
-and absence of gather/staging calls. The C strided harness checks signed layouts,
+and absence of gather/staging calls. The C strided harness checks forced-general and forced-specialized float
+paths, guard-page span boundaries, exact reduction parity, signed layouts,
 wrapping multiplication at every width, reducers, masks, complex arithmetic,
 conversion, invalid descriptors, and execution with all heap allocators disabled
 in SIMD and scalar builds. Run `examples/strides.lisp` for negative strides and
-strided BLAS calls. Run `tests/strided-bench.lisp` for complete-call timings and
+strided BLAS calls. Lisp tests also cover concurrent disjoint interleaved
+updates. See [memory-path profiling](strided-performance.md#memory-path-profiling)
+for paired specialization trials. Run `tests/strided-bench.lisp` for complete-call timings and
 allocated bytes; `TRIVIAL_SIMD_STRIDED_QUICK=1` restricts it to stride-two sum/add.
 
 Reduction tests cover `prod`, `minimum`, `maximum`, `argmin`, `argmax`, `asum`, `nrm2`
