@@ -5,6 +5,7 @@ import csv
 import statistics
 import math
 import gzip
+import json
 from collections import defaultdict
 
 OPERATIONS = {"add": 0, "add-scalar": 0, "subtract": 1, "multiply": 2, "divide": 3,
@@ -73,14 +74,48 @@ def admissions(rows, variant):
     return sorted(accepted)
 
 
+def validate_dispatch(rows, accepted, limits):
+    allowed = {entry[0]: entry[1] for entry in limits}
+    controls = defaultdict(list)
+    eligible_layouts = {(entry[2], entry[3], tuple(entry[4])): entry[1] for entry in limits}
+    for key, baseline in rows.items():
+        if key[-1] != "general":
+            continue
+        if key[:3] in eligible_layouts and key[3] >= eligible_layouts[key[:3]]:
+            continue
+        other = (*key[:-1], "dispatch")
+        if other not in rows:
+            raise ValueError(f"missing dispatch control: {key[:-1]}")
+        controls[key[:-2]].append(1 - rows[other] / baseline)
+    rejected = set()
+    for case, gains in controls.items():
+        if len(gains) != 5:
+            raise ValueError(f"incomplete dispatch control: {case}")
+        if statistics.median(gains) < -.05:
+            rejected.add(case[:2])
+    return [entry for entry in accepted if entry[0] in allowed
+            and entry[1] >= allowed[entry[0]] and tuple(entry[2:4]) not in rejected]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("csv", nargs="+")
     parser.add_argument("--variant", choices=("candidate", "dispatch"), default="candidate")
     parser.add_argument("--lisp", action="store_true", help="emit benchmark case data")
+    parser.add_argument("--json", action="store_true", help="emit candidate admission limits")
+    parser.add_argument("--limits", help="candidate JSON required for normal dispatch")
     parser.add_argument("--header", choices=("arm64", "x86-64"), help="emit an architecture-gated C header")
     args = parser.parse_args()
-    accepted = admissions(load(args.csv), args.variant)
+    rows = load(args.csv)
+    accepted = admissions(rows, args.variant)
+    if args.variant == "dispatch":
+        if not args.limits:
+            parser.error("normal dispatch requires --limits candidate.json")
+        with open(args.limits) as stream:
+            accepted = validate_dispatch(rows, accepted, json.load(stream))
+    if args.json:
+        print(json.dumps(accepted))
+        return
     if args.lisp:
         print("(")
         for _, count, type_, operation, layout in accepted:
