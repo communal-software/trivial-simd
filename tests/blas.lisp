@@ -72,12 +72,32 @@
 (defmacro without-float-traps (&body body)
   #+sbcl `(sb-int:with-float-traps-masked (:divide-by-zero :invalid :overflow :inexact)
             ,@body)
-  #+ecl `(progn (ext:trap-fpe t nil)
-                (unwind-protect (progn ,@body) (ext:trap-fpe t t)))
+  #+ecl (let ((mode (gensym "TRAP-MODE")))
+          `(let ((,mode (ext:trap-fpe 'last nil)))
+             (ext:trap-fpe t nil)
+             (unwind-protect (progn ,@body) (ext:trap-fpe ,mode t))))
   #+ccl `(let ((mode (ccl:get-fpu-mode)))
            (ccl:set-fpu-mode :division-by-zero nil :invalid nil :overflow nil)
            (unwind-protect (progn ,@body) (apply #'ccl:set-fpu-mode mode)))
   #-(or sbcl ecl ccl) `(progn ,@body))
+
+#+ecl
+(test blas-float-traps-are-restored
+  (let ((original (ext:trap-fpe 'last nil)))
+    (unwind-protect
+         (progn
+           (ext:trap-fpe t nil)
+           (ext:trap-fpe 'division-by-zero t)
+           (let ((mode (ext:trap-fpe 'last nil)))
+             (without-float-traps
+               (is (zerop (ext:trap-fpe 'last nil)))
+               (without-float-traps (is (zerop (ext:trap-fpe 'last nil))))
+               (is (zerop (ext:trap-fpe 'last nil))))
+             (is (= mode (ext:trap-fpe 'last nil)))
+             (handler-case (without-float-traps (error "Unwind trap settings"))
+               (simple-error ()))
+             (is (= mode (ext:trap-fpe 'last nil)))))
+      (ext:trap-fpe original t))))
 
 (test blas-axpy-reference
   (when (reference-blas-available-p)
