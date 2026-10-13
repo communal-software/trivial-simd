@@ -1,13 +1,24 @@
 #include <assert.h>
+#include <stdio.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 static size_t allocations;
 static void *strided_malloc(size_t n) { (void)n; ++allocations; return NULL; }
 static void *strided_calloc(size_t n, size_t size) { (void)n; (void)size; ++allocations; return NULL; }
 static void *strided_realloc(void *p, size_t n) { (void)p; (void)n; ++allocations; return NULL; }
+#define TS_STRIDED_MEMORY_TEST
+#ifdef TS_FORCE_STRIDED_SPECIALIZATIONS
+static int strided_specialized = 1;
+#else
+static int strided_specialized;
+#endif
 #define malloc strided_malloc
 #define calloc strided_calloc
 #define realloc strided_realloc
@@ -105,12 +116,159 @@ static void complex_and_conversions(void) {
     for (size_t i = 0; i < 17; ++i) assert(doubles[2*i] == 1);
 }
 
+
+#define CHECK_FLOAT_LAYOUT(suffix, type, code, fused) do { \
+    type a[256], b[256], c[256], out[256]; \
+    int64_t layouts[] = {-2, -1, 0, 1, 2, 3}; \
+    for (size_t n = 0; n <= 33; ++n) \
+    for (size_t d = 0; d < 6; ++d) { \
+        if (!layouts[d]) continue; \
+        for (size_t left = 0; left < 6; ++left) \
+        for (size_t right = 0; right < 6; ++right) { \
+            for (size_t j = 0; j < 256; ++j) { \
+                a[j] = (type)(j % 13 - 6.0); b[j] = (type)(1 + j % 7); \
+                c[j] = (type)(j % 5 - 2.0); out[j] = -99; \
+            } \
+            int64_t steps[] = {layouts[d], layouts[left], layouts[right], -1}; \
+            void *p[] = {out + 100, a + 100, b + 100, c + 100}; \
+            unsigned operations[] = {TS_ND_ADD, TS_ND_SUBTRACT, TS_ND_MULTIPLY, TS_ND_DIVIDE, \
+                TS_ND_NEGATE, TS_ND_ABS, TS_ND_MIN, TS_ND_MAX, TS_STRIDED_SCALE, TS_STRIDED_AXPY, TS_STRIDED_FMA}; \
+            for (size_t op = 0; op < sizeof operations / sizeof operations[0]; ++op) { \
+                for (size_t j = 0; j < 256; ++j) out[j] = -99; \
+                assert(ts_strided_execute(operations[op], code, code, 0, 0, 0, n, steps, p) == 0); \
+                for (size_t j = 0; j < 256; ++j) { \
+                    int64_t delta = (int64_t)j - 100, logical = delta / steps[0]; \
+                    if (delta % steps[0] || logical < 0 || (size_t)logical >= n) { assert(out[j] == -99); continue; } \
+                    type x = a[100 + logical * steps[1]], y = b[100 + logical * steps[2]], expected; \
+                    switch (operations[op]) { \
+                    case TS_ND_ADD: expected = x + y; break; \
+                    case TS_ND_SUBTRACT: expected = x - y; break; \
+                    case TS_ND_MULTIPLY: expected = x * y; break; \
+                    case TS_ND_DIVIDE: expected = x / y; break; \
+                    case TS_ND_NEGATE: expected = -x; break; \
+                    case TS_ND_ABS: expected = (type)fabs(x); break; \
+                    case TS_ND_MIN: expected = x <= y ? x : y; break; \
+                    case TS_ND_MAX: expected = x >= y ? x : y; break; \
+                    case TS_STRIDED_SCALE: expected = -99 * x; break; \
+                    case TS_STRIDED_AXPY: expected = x * y - 99; break; \
+                    default: expected = fused(x, y, c[100 - logical]); break; \
+                    } \
+                    if (out[j] != expected) fprintf(stderr, "code=%u n=%zu op=%u d=%lld l=%lld r=%lld j=%zu actual=%.17g expected=%.17g\n", code, n, operations[op], (long long)steps[0], (long long)steps[1], (long long)steps[2], j, (double)out[j], (double)expected); \
+                    assert(out[j] == expected); \
+                    if (expected == 0) assert(signbit(out[j]) == signbit(expected)); \
+                } \
+            } \
+        } \
+    } \
+} while (0)
+
+#define CHECK_MEMORY_BITS(suffix, type, width, store) do { \
+    type values[40], general[width], specialized[width]; \
+    unsigned char *bits = (unsigned char *)values; \
+    for (size_t j = 0; j < sizeof values; ++j) bits[j] = (unsigned char)(j * 73 + 19); \
+    const int64_t steps[] = {-2, -1, 0, 1, 2, 3}; \
+    for (size_t j = 0; j < 6; ++j) \
+    for (size_t remaining = width; remaining <= width + 1; ++remaining) \
+    for (size_t processed = 0; processed <= width; processed += width) { \
+        store(general, ts_strided_load_##suffix(values + 16, steps[j], remaining, processed, 0, 1)); \
+        store(specialized, ts_strided_load_##suffix(values + 16, steps[j], remaining, processed, 1, 1)); \
+        assert(memcmp(general, specialized, sizeof general) == 0); \
+        type a[40], b[40]; memset(a, 19, sizeof a); memcpy(b, a, sizeof a); \
+        ts_strided_store_##suffix(a + 16, steps[j], TS_##suffix##_LOAD(values), 0); \
+        ts_strided_store_##suffix(b + 16, steps[j], TS_##suffix##_LOAD(values), 1); \
+        assert(memcmp(a, b, sizeof a) == 0); \
+    } \
+} while (0)
+#define TS_f32_LOAD TS_F32_LOAD
+#define TS_f64_LOAD TS_F64_LOAD
+
+static void specialized_layouts(void) {
+    CHECK_FLOAT_LAYOUT(f32, float, 0, fmaf);
+    CHECK_FLOAT_LAYOUT(f64, double, 1, fma);
+    CHECK_MEMORY_BITS(f32, float, TS_F32_WIDTH, TS_F32_STORE);
+    CHECK_MEMORY_BITS(f64, double, TS_F64_WIDTH, TS_F64_STORE);
+}
+#undef TS_f32_LOAD
+#undef TS_f64_LOAD
+
+static void exact_reducers(void) {
+    float a[600], b[600]; double da[600], db[600];
+    for (size_t i = 0; i < 600; ++i) {
+        a[i] = (i % 3 == 0 ? 1e15f : i % 3 == 1 ? -1e15f : 0.125f);
+        b[i] = i % 2 ? 1.5f : -0.5f;
+        da[i] = a[i]; db[i] = b[i];
+    }
+    int saved = strided_specialized;
+    const int64_t steps[] = {-2, -1, 1, 2, 3};
+    for (unsigned type = 0; type < 2; ++type)
+    for (unsigned op = TS_STRIDED_SUM; op <= TS_STRIDED_DOT; ++op)
+    for (int wide = 0; wide <= (type == 0); ++wide)
+    for (size_t n = 0; n <= 257; ++n)
+    for (size_t left = 0; left < 5; ++left)
+    for (size_t right = 0; right < 5; ++right) {
+        if (steps[left] == 3 || steps[right] == 3) { if (n > 100) continue; }
+        size_t ai = steps[left] < 0 ? (n ? n - 1 : 0) * (size_t)-steps[left] + 1 : 1;
+        size_t bi = steps[right] < 0 ? (n ? n - 1 : 0) * (size_t)-steps[right] + 1 : 1;
+        const void *x = type ? (void *)(da + ai) : (void *)(a + ai);
+        const void *y = type ? (void *)(db + bi) : (void *)(b + bi);
+        unsigned char general[8] = {0}, candidate[8] = {0};
+        double gw = 0, cw = 0; uint64_t gi = 0, ci = 0;
+        strided_specialized = 0;
+        assert(ts_strided_reduce(op, type, n, x, y, steps[left], steps[right], wide, general, &gw, &gi) == 0);
+        strided_specialized = 1;
+        assert(ts_strided_reduce(op, type, n, x, y, steps[left], steps[right], wide, candidate, &cw, &ci) == 0);
+        assert(memcmp(general, candidate, sizeof general) == 0);
+        assert(memcmp(&gw, &cw, sizeof gw) == 0);
+    }
+    strided_specialized = saved;
+}
+
+static void guarded_spans(void) {
+#if defined(__unix__) || defined(__APPLE__)
+    size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    unsigned char *allocation = mmap(NULL, 3 * page, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    assert(allocation != MAP_FAILED);
+    unsigned char *storage = allocation + page;
+    assert(mprotect(storage, page, PROT_READ | PROT_WRITE) == 0);
+    for (unsigned type = 0; type < 2; ++type) {
+        size_t bytes = type ? sizeof(double) : sizeof(float);
+        for (size_t n = 1; n <= 17; ++n)
+        for (int64_t step = -2; step <= 2; ++step) {
+            if (!step) continue;
+            size_t span = ((n - 1) * (size_t)llabs(step) + 1) * bytes;
+            for (unsigned end = 0; end < 2; ++end) {
+                unsigned char *first = end ? storage + page - span : storage;
+                for (size_t j = 0; j < span / bytes; ++j) {
+                    if (type) ((double *)first)[j] = 1; else ((float *)first)[j] = 1;
+                }
+                void *start = step < 0 ? first + span - bytes : first;
+                int64_t steps[] = {step, step, 0, 1};
+                double scalar = 2;
+                float single_scalar = 2;
+                void *p[] = {start, start, type ? (void *)&scalar : (void *)&single_scalar, NULL};
+                assert(ts_strided_execute(TS_ND_ADD, type, type, 0, 0, 0, n, steps, p) == 0);
+                /* A distinct output exercises bounded packed input loads. */
+                double output[40], wide;
+                uint64_t index;
+                p[0] = output; steps[0] = 1;
+                assert(ts_strided_execute(TS_ND_ADD, type, type, 0, 0, 0, n, steps, p) == 0);
+                assert(ts_strided_reduce(TS_STRIDED_SUM, type, n, start, NULL, step, 1, 0, output, &wide, &index) == 0);
+                assert(ts_strided_reduce(TS_STRIDED_DOT, type, n, start, start, step, step, 0, output, &wide, &index) == 0);
+                if (!type) assert(ts_strided_reduce(TS_STRIDED_SUM, type, n, start, NULL, step, 1, 1, output, &wide, &index) == 0);
+            }
+        }
+    }
+    assert(munmap(allocation, 3 * page) == 0);
+#endif
+}
+
 int main(void) {
     TEST_INTEGER(2, uint8_t); TEST_INTEGER(3, uint8_t);
     TEST_INTEGER(4, uint16_t); TEST_INTEGER(5, uint16_t);
     TEST_INTEGER(6, uint32_t); TEST_INTEGER(7, uint32_t);
     TEST_INTEGER(8, uint64_t); TEST_INTEGER(9, uint64_t);
     float_operations(); transfers_and_masks(); complex_and_conversions();
+    specialized_layouts(); exact_reducers(); guarded_spans();
     assert(allocations == 0);
     return 0;
 }

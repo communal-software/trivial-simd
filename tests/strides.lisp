@@ -502,3 +502,48 @@ a contiguous call on plainly gathered temporaries. An item is a scalar or
                                (actual (with-backend (:native)
                                          (funcall operation a :end count :input-start start :stride stride))))
                           (is (eql actual expected)))))))))))))))
+
+(test native-float-specialization-layouts
+  (when simd::*native-available-p*
+    (with-backend (:native)
+      (dolist (mode '(:pointer :copy))
+        (let ((simd::*native-array-access* mode))
+          (dolist (type '(single-float double-float))
+            (dolist (count '(0 1 2 3 4 5 7 8 9 15 16 17 257 1024))
+              (let ((size (+ 8 (* 3 count))))
+                (dolist (steps '((-1 -1 -1) (2 2 2) (-2 -2 -2) (1 -1 2) (2 -1 1)))
+                  (dolist (operation '(simd:add! simd:subtract! simd:multiply! simd:divide! simd:min! simd:max!))
+                    (check-strided operation
+                                   (list (list :out (copy-vector type size 0) :destination)
+                                         (list :in (scrambled-vector type size 1) :left)
+                                         (list :in (copy-vector type size 3) :right))
+                                   steps :count count))
+                  (check-strided 'simd:fma!
+                                 (list (list :out (copy-vector type size 0) :destination)
+                                       (list :in (scrambled-vector type size 1) :x)
+                                       (list :in (copy-vector type size 3) :y)
+                                       (list :in (scrambled-vector type size 4) :z))
+                                 (append steps '(2)) :count count))))))))))
+
+(test native-float-disjoint-interleaved-updates
+  (when simd::*native-available-p*
+    (dolist (type '(:f32 :f64))
+      (let* ((foreign (if (eq type :f32) :float :double))
+             (one (if (eq type :f32) 1f0 1d0))
+             (count 1025))
+        (cffi:with-foreign-object (storage foreign (* 2 count))
+          (dotimes (i (* 2 count)) (setf (cffi:mem-aref storage foreign i) one))
+          (let* ((view (simd:make-vector-view storage type (* 2 count)))
+                 (workers
+                   (loop for offset below 2 collect
+                     (let ((start offset))
+                       (bt:make-thread
+                        (lambda ()
+                          (with-backend (:native)
+                            (dotimes (iteration 100)
+                              (simd:add! view view one :end count :destination-start start :left-start start
+                                                     :destination-stride 2 :left-stride 2)
+                              (simd:scale! view one :start start :end (+ start count) :stride 2)))))))))
+            (dolist (worker workers) (bt:join-thread worker))
+            (dotimes (i (* 2 count))
+              (is (= (+ one 100) (cffi:mem-aref storage foreign i))))))))))

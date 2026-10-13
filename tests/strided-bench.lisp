@@ -1,5 +1,7 @@
 (require :asdf)
 (load (merge-pathnames "quicklisp/setup.lisp" (user-homedir-pathname)))
+(let ((root (merge-pathnames "../" (uiop:pathname-directory-pathname *load-truename*))))
+  (asdf:initialize-source-registry `(:source-registry (:directory ,root) :inherit-configuration)))
 (asdf:load-system "trivial-simd")
 (load (merge-pathnames "benchmark-timing.lisp" *load-truename*))
 
@@ -13,6 +15,10 @@
              (dotimes (i 1000) (funcall function))
              (values time #+sbcl (/ (- (sb-ext:get-bytes-consed) before) 1000d0) #-sbcl nil)))
       (setf (symbol-function 'trivial-simd::direct-strided-p) dispatch))))
+
+(when (uiop:getenv "TRIVIAL_SIMD_STRIDED_PROFILE")
+  (load (merge-pathnames "strided-memory-profile.lisp" *load-truename*))
+  (uiop:quit))
 
 (format t "mode,operation,count,stride,baseline_us,direct_us,speedup,baseline_bytes,direct_bytes~%")
 (let ((trivial-simd::*backend* :native))
