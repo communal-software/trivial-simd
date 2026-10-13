@@ -496,7 +496,12 @@ Empty slices give NIL for the extrema and a zero otherwise."
                                         `(,aref ,(nth argument arguments)
                                                 (+ ,(nth argument offsets) ,index)))))))
                      (:constant (kernel-constant-form (second node) type))
-                     (:negate (operation (symbol-for "-") (list `(,cast 0) (walk (second node)))))
+                     (:negate
+                      (if (integer-type-p type)
+                          (operation (symbol-for "-") (list `(,cast 0) (walk (second node))))
+                          (operation (symbol-for "-XOR")
+                                     (list `(,cast ,(- (coerce 0 (kernel-element-type type))))
+                                           (walk (second node))))))
                      (:unary (pack-math (second node) (list (walk (third node)))))
                      (:fma (pack-math :fma (mapcar #'walk (rest node))))
                      (:operation

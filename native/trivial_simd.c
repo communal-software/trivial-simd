@@ -30,6 +30,8 @@
 #define TS_F64_DIV(a, b) vdivq_f64(a, b)
 #define TS_F32_SQRT(a) vsqrtq_f32(a)
 #define TS_F64_SQRT(a) vsqrtq_f64(a)
+#define TS_F32_NEGATE(a) vnegq_f32(a)
+#define TS_F64_NEGATE(a) vnegq_f64(a)
 #define TS_F32_ABS(a) vabsq_f32(a)
 #define TS_F64_ABS(a) vabsq_f64(a)
 #define TS_F32_MIN(a, b) vbslq_f32(vcleq_f32(a, b), a, b)
@@ -63,6 +65,8 @@
 #define TS_F64_DIV(a, b) _mm_div_pd(a, b)
 #define TS_F32_SQRT(a) _mm_sqrt_ps(a)
 #define TS_F64_SQRT(a) _mm_sqrt_pd(a)
+#define TS_F32_NEGATE(a) _mm_xor_ps(a, _mm_set1_ps(-0.0f))
+#define TS_F64_NEGATE(a) _mm_xor_pd(a, _mm_set1_pd(-0.0))
 #define TS_F32_ABS(a) _mm_andnot_ps(_mm_set1_ps(-0.0f), a)
 #define TS_F64_ABS(a) _mm_andnot_pd(_mm_set1_pd(-0.0), a)
 #define TS_F32_MIN(a, b) _mm_min_ps(b, a)
@@ -112,6 +116,8 @@ static __m128d ts_fma_f64(__m128d a, __m128d b, __m128d c) {
 #define TS_F64_DIV(a, b) ((a) / (b))
 #define TS_F32_SQRT(a) ((a) == 0 ? copysignf(0.0f, a) : sqrtf(a))
 #define TS_F64_SQRT(a) ((a) == 0 ? copysign(0.0, a) : sqrt(a))
+#define TS_F32_NEGATE(a) (-(a))
+#define TS_F64_NEGATE(a) (-(a))
 #define TS_F32_ABS(a) fabsf(a)
 #define TS_F64_ABS(a) fabs(a)
 #define TS_F32_MIN(a, b) ((a) == (b) ? copysignf(a, a) : ((a) < (b) ? (a) : (b)))
@@ -353,9 +359,8 @@ TS_LAZY_DECLARATION(u64, uint64_t)
 #include "kernel-vm.h"
 #include "masks.h"
 
-/* TODO: zero subtraction loses -0; use sign negation in the older VM (#76). */
 #define TS_KERNEL_RUN(suffix, mode, sum, type, width, load, store, zero, add, sub, mul, div, \
-                      sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
+                      negate, sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
 static int ts_kernel_apply_##mode##_##suffix(unsigned op, type *destination, \
                                              const type *left, const type *right, size_t m) { \
     size_t i = 0; \
@@ -426,8 +431,8 @@ static int ts_kernel_apply_##mode##_##suffix(unsigned op, type *destination, \
         break; \
     case TS_OP_NEGATE: \
         for (; i + width <= m; i += width) \
-            store(destination + i, sub(zero(), load(left + i))); \
-        for (; i < m; ++i) destination[i] = (type)0 - left[i]; \
+            store(destination + i, negate(load(left + i))); \
+        for (; i < m; ++i) destination[i] = -left[i]; \
         break; \
     } \
     return 0; \
@@ -441,7 +446,7 @@ static int ts_kernel_run_##mode##_##suffix(const uint8_t *code, size_t code_leng
 }
 
 #define TS_KERNEL(suffix, type, vector_type, width, load, store, zero, add, sub, mul, div, \
-                  sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
+                  negate, sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
 static int ts_kernel_reduce_##suffix(uint8_t op, const type *left, const type *right, \
                                     type constant, size_t m, type *out) { \
     vector_type lanes = zero(); \
@@ -495,7 +500,7 @@ static int ts_kernel_reduce_##suffix(uint8_t op, const type *left, const type *r
         TS_KERNEL_REDUCE(type, width, store, add, maxv(load(left + i), load(right + i)), (left[i] >= right[i] ? left[i] : right[i])); \
         break; \
     case TS_OP_NEGATE: \
-        TS_KERNEL_REDUCE(type, width, store, add, sub(zero(), load(left + i)), (type)0 - left[i]); \
+        TS_KERNEL_REDUCE(type, width, store, add, negate(load(left + i)), -left[i]); \
         break; \
     default: return -1; \
     } \
@@ -503,9 +508,9 @@ static int ts_kernel_reduce_##suffix(uint8_t op, const type *left, const type *r
     return 0; \
 } \
 TS_KERNEL_RUN(suffix, elementwise, 0, type, width, load, store, zero, add, sub, mul, div, \
-              sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
+              negate, sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
 TS_KERNEL_RUN(suffix, sum, 1, type, width, load, store, zero, add, sub, mul, div, \
-              sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
+              negate, sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
 static int ts_kernel_allocate_##suffix(const uint8_t *code, size_t code_length, \
                        const type *constants, const type *const *inputs, \
                        type *out, size_t n, size_t scratch_count, int sum) { \
@@ -546,10 +551,10 @@ int ts_kernel_sum_with_scratch_##suffix(const uint8_t *code, size_t code_length,
 
 TS_KERNEL(f32, float, TS_F32_VECTOR, TS_F32_WIDTH, TS_F32_LOAD, TS_F32_STORE, TS_F32_ZERO,
           TS_F32_ADD, TS_F32_SUB, TS_F32_MUL, TS_F32_DIV,
-          TS_F32_SQRT, TS_F32_ABS, TS_F32_MIN, TS_F32_MAX, TS_F32_FMA, sqrtf, fabsf, fmaf)
+          TS_F32_NEGATE, TS_F32_SQRT, TS_F32_ABS, TS_F32_MIN, TS_F32_MAX, TS_F32_FMA, sqrtf, fabsf, fmaf)
 TS_KERNEL(f64, double, TS_F64_VECTOR, TS_F64_WIDTH, TS_F64_LOAD, TS_F64_STORE, TS_F64_ZERO,
           TS_F64_ADD, TS_F64_SUB, TS_F64_MUL, TS_F64_DIV,
-          TS_F64_SQRT, TS_F64_ABS, TS_F64_MIN, TS_F64_MAX, TS_F64_FMA, sqrt, fabs, fma)
+          TS_F64_NEGATE, TS_F64_SQRT, TS_F64_ABS, TS_F64_MIN, TS_F64_MAX, TS_F64_FMA, sqrt, fabs, fma)
 
 #include "integer.h"
 #include "kernel-lazy.h"

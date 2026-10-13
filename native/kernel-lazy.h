@@ -76,31 +76,6 @@ TS_LAZY_INTEGER_APPLY(s64, uint64_t)
 TS_LAZY_INTEGER_APPLY(u64, uint64_t)
 #undef TS_LAZY_INTEGER_APPLY
 
-#if !defined(TS_SCALAR) && (defined(__aarch64__) || defined(_M_ARM64))
-#define TS_LAZY_NEGATE_F32(x) vnegq_f32(x)
-#define TS_LAZY_NEGATE_F64(x) vnegq_f64(x)
-#elif !defined(TS_SCALAR) && (defined(__x86_64__) || defined(_M_X64))
-#define TS_LAZY_NEGATE_F32(x) _mm_xor_ps(x, _mm_set1_ps(-0.0f))
-#define TS_LAZY_NEGATE_F64(x) _mm_xor_pd(x, _mm_set1_pd(-0.0))
-#else
-#define TS_LAZY_NEGATE_F32(x) (-(x))
-#define TS_LAZY_NEGATE_F64(x) (-(x))
-#endif
-
-#define TS_LAZY_FLOAT_APPLY(suffix, type, width, load, store, negate) \
-static int ts_lazy_apply_##suffix(unsigned op, type *out, const type *left, const type *right, size_t n) { \
-    if (op != TS_OP_NEGATE) return ts_kernel_apply_elementwise_##suffix(op, out, left, right, n); \
-    size_t i = 0; \
-    for (; i + width <= n; i += width) store(out + i, negate(load(left + i))); \
-    for (; i < n; ++i) out[i] = -left[i]; \
-    return 0; \
-}
-TS_LAZY_FLOAT_APPLY(f32, float, TS_F32_WIDTH, TS_F32_LOAD, TS_F32_STORE, TS_LAZY_NEGATE_F32)
-TS_LAZY_FLOAT_APPLY(f64, double, TS_F64_WIDTH, TS_F64_LOAD, TS_F64_STORE, TS_LAZY_NEGATE_F64)
-#undef TS_LAZY_FLOAT_APPLY
-#undef TS_LAZY_NEGATE_F32
-#undef TS_LAZY_NEGATE_F64
-
 #define TS_LAZY_KERNEL(suffix, type, apply) \
 static int ts_lazy_kernel_##suffix(const uint8_t *code, size_t length, const type *constants, \
         const type *const *inputs, type *out, size_t n, size_t slots, type *scratch) { \
@@ -173,8 +148,8 @@ static int ts_lazy_kernel_##suffix(const uint8_t *code, size_t length, const typ
     } \
     return 0; \
 }
-TS_LAZY_KERNEL(f32, float, ts_lazy_apply_f32)
-TS_LAZY_KERNEL(f64, double, ts_lazy_apply_f64)
+TS_LAZY_KERNEL(f32, float, ts_kernel_apply_elementwise_f32)
+TS_LAZY_KERNEL(f64, double, ts_kernel_apply_elementwise_f64)
 TS_LAZY_KERNEL(s8, uint8_t, ts_lazy_apply_s8)
 TS_LAZY_KERNEL(u8, uint8_t, ts_lazy_apply_u8)
 TS_LAZY_KERNEL(s16, uint16_t, ts_lazy_apply_s16)

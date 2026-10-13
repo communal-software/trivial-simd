@@ -120,6 +120,8 @@ without a fixed ULP or cross-backend bit-identity guarantee.
 
 `sqrt` signals an error for a negative operand on every backend; negative zero
 is valid. An arithmetic error may leave part of `destination` updated.
+Unary `-` flips the sign of each float, including positive and negative zero.
+Sums start from positive zero, so summing negated zero lanes can return positive zero.
 `min` and `max` retain the left operand on equal values, including signed zeros.
 
 `fma` uses round-to-nearest-even for finite operands with finite results,
@@ -198,10 +200,6 @@ for measurements and [FMA fallback limitations](#limitations).
   do not meet their measured gates. See [selection-reducer limitations](mask-reducers.md#limitations).
   Further SBCL mask coverage is tracked in
   [#68](https://github.com/communal-software/trivial-simd/issues/68).
-- The older real native VM uses zero subtraction for unary negation and loses
-  the negative sign when negating positive zero. The lazy selection-reducer
-  path uses sign negation. See
-  [#76](https://github.com/communal-software/trivial-simd/issues/76).
 - NaNs, infinities, non-default rounding modes, and floating-point traps may
   behave differently by backend. See the
   [IEEE consistency ticket](https://github.com/communal-software/trivial-simd/issues/33).

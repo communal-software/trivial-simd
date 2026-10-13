@@ -117,8 +117,15 @@ retained functions after redefinition, and collection during active native calls
 Threaded tests exercise concurrent first use with private call buffers. ECL tests
 also check helper sharing across definitions, signature separation, both
 precisions and access modes, concurrent initialization, compiler-failure fallback,
-and collection with populated helper caches. Kernel tests cover register spilling, scratch-slot reuse, encoding boundaries, square-root domain errors, signed zeros, single-rounding FMA, deterministic exact-reference comparisons, forced FMA fallbacks, and
-scalar-returning sums with slices and spilling. ECL also exercises interpreted
+and collection with populated helper caches.
+
+Kernel negation tests check both zero signs in packed lanes, scalar tails,
+sum-path intermediates, slices, in-place calls, and block boundaries in both
+float precisions. Negation sums retain the positive-zero identity.
+Kernel tests cover register spilling, scratch-slot reuse, encoding boundaries,
+square-root domain errors, signed zeros, single-rounding FMA, deterministic
+exact-reference comparisons, forced FMA fallbacks, and scalar-returning sums
+with slices and spilling. ECL also exercises interpreted
 spilling and reduction definitions. Interpreted ECL mask tests cover depth-eight
 selections, byte masks, every reduction, both float precisions and all eight
 integer types, empty and offset slices, shifted overlap across native block

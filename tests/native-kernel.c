@@ -92,6 +92,48 @@ static void check_zero_sign(double value, int negative, const char *operation) {
     }
 }
 
+#define CHECK_NEGATION(suffix, type) \
+static void check_negation_##suffix(void) { \
+    type a[600], out[600], expected[600]; \
+    const type *inputs[] = {a}; \
+    const uint8_t direct[] = {TS_OP_NEGATE, TS_KERNEL_OUTPUT, 8, 0}; \
+    const uint8_t intermediate[] = {TS_OP_NEGATE, 0, 8, 0, TS_OP_COPY, TS_KERNEL_OUTPUT, 0, 0}; \
+    const size_t lengths[] = {0, 1, 2, 3, 4, 5, 255, 256, 257, 600}; \
+    for (unsigned pattern = 0; pattern < 4; ++pattern) { \
+        for (size_t i = 0; i < 600; ++i) { \
+            const type mixed[] = {0, -(type)0.0, 2, -3}; \
+            a[i] = pattern == 0 ? 0 : pattern == 1 ? -(type)0.0 : \
+                   pattern == 2 ? (i % 2 ? -(type)0.0 : 0) : mixed[i % 4]; \
+            expected[i] = -a[i]; \
+        } \
+        for (size_t l = 0; l < sizeof(lengths) / sizeof(lengths[0]); ++l) { \
+            size_t n = lengths[l]; \
+            out[n < 600 ? n : 599] = 42; \
+            assert(ts_kernel_##suffix(direct, sizeof(direct), NULL, inputs, out, n, 0) == 0); \
+            for (size_t i = 0; i < n; ++i) { \
+                assert(out[i] == expected[i]); \
+                if (expected[i] == 0) check_zero_sign(out[i], !!signbit(expected[i]), "negate"); \
+            } \
+            if (n < 600) assert(out[n] == 42); \
+            assert(ts_kernel_apply_sum_##suffix(TS_OP_NEGATE, out, a, NULL, n) == 0); \
+            for (size_t i = 0; i < n; ++i) { \
+                assert(out[i] == expected[i]); \
+                if (expected[i] == 0) check_zero_sign(out[i], !!signbit(expected[i]), "sum negate"); \
+            } \
+            type sum = ts_sum_##suffix(expected, n), actual[2] = {-9, 42}; \
+            assert(ts_kernel_sum_##suffix(direct, sizeof(direct), NULL, inputs, actual, n, 0) == 0); \
+            assert(actual[0] == sum && actual[1] == 42); \
+            if (sum == 0) check_zero_sign(actual[0], !!signbit(sum), "negate sum"); \
+            assert(ts_kernel_sum_##suffix(intermediate, sizeof(intermediate), NULL, inputs, actual, n, 0) == 0); \
+            assert(actual[0] == sum && actual[1] == 42); \
+            if (sum == 0) check_zero_sign(actual[0], !!signbit(sum), "intermediate negate sum"); \
+        } \
+    } \
+}
+
+CHECK_NEGATION(f32, float)
+CHECK_NEGATION(f64, double)
+
 #define CHECK_MATH(suffix, type, epsilon, root, absolute, fused) \
 static void check_math_##suffix(void) { \
     type a[600], b[600], c[600], out[600]; \
@@ -1014,6 +1056,8 @@ int main(void) {
     check_scalar_fma();
     check_f32();
     check_f64();
+    check_negation_f32();
+    check_negation_f64();
     check_math_f32();
     check_math_f64();
     check_final_output_f32();
