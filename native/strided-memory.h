@@ -48,8 +48,9 @@ static int ts_strided_memory_enabled(unsigned op, unsigned type, size_t n, const
     static const struct gate gates[] = {
 #include "strided-memory-gates.h"
     };
-    if (n < 16) return 0;
+    if (n < TS_STRIDED_MEMORY_MIN_COUNT) return 0;
     unsigned key = ts_strided_memory_key(op, type, steps);
+    if (key == UINT32_MAX) return 0;
     size_t low = 0, high = sizeof gates / sizeof gates[0];
     while (low < high) {
         size_t middle = low + (high - low) / 2;

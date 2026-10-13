@@ -526,7 +526,7 @@ a contiguous call on plainly gathered temporaries. An item is a scalar or
                                  (append steps '(2)) :count count))))))))))
 
 (test native-float-disjoint-interleaved-updates
-  (when simd::*native-available-p*
+  (when (and simd::*native-available-p* bordeaux-threads:*supports-threads-p*)
     (dolist (type '(:f32 :f64))
       (let* ((foreign (if (eq type :f32) :float :double))
              (one (if (eq type :f32) 1f0 1d0))

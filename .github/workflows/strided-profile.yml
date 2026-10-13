@@ -27,7 +27,7 @@ jobs:
       - name: Build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_STRIDED_PROFILE=ON
-          cmake --build build --parallel 2
+          cmake --build build --parallel 4
           ctest --test-dir build --output-on-failure
       - uses: 40ants/setup-lisp@v4
         with:
@@ -38,6 +38,8 @@ jobs:
         run: |
           ros config set dynamic-space-size 4GB
           ros -Q run --load tests/run.lisp
+          ros -Q run --eval '(handler-case (load "tests/strided-profile-check.lisp") (error (condition) (format *error-output* "~A~%" condition) (uiop:quit 1)))'
+          python3 tests/test-strided-gates.py
       - name: Measurements
         shell: lispsh -eo pipefail {0}
         run: |
@@ -52,10 +54,36 @@ jobs:
             for variant in $variants; do
               export TRIVIAL_SIMD_STRIDED_VARIANT=$variant
               export TRIVIAL_SIMD_STRIDED_OUTPUT="strided-profile/$variant-$trial.csv"
-              ros -Q run --eval '(load "tests/strided-bench.lisp")'
+              ros -Q run --eval '(handler-case (load "tests/strided-bench.lisp") (error (condition) (format *error-output* "~A~%" condition) (uiop:quit 1)))'
             done
           done
           python3 tests/strided-gates.py strided-profile/*.csv > strided-profile/candidate-gates.h
+      - name: Validate normal dispatch
+        shell: lispsh -eo pipefail {0}
+        run: |
+          python3 tests/strided-gates.py --lisp strided-profile/*.csv > strided-profile/candidate-cases.lisp
+          python3 tests/strided-gates.py --header x86-64 strided-profile/*.csv > native/strided-memory-gates.h
+          cp native/strided-memory-gates.h strided-profile/candidate-header.h
+          if [ "$(wc -l < strided-profile/candidate-cases.lisp)" -gt 2 ]; then
+            cmake --build build --target trivial_simd --parallel 4
+            ros -Q run --load tests/run.lisp
+            mkdir -p strided-profile/validation
+            export TRIVIAL_SIMD_STRIDED_PROFILE=1
+            export TRIVIAL_SIMD_STRIDED_GATES=strided-profile/candidate-cases.lisp
+            for trial in 0 1 2 3 4; do
+              export TRIVIAL_SIMD_STRIDED_TRIAL=$trial
+              variants="general dispatch"
+              if [ $((trial % 2)) -eq 1 ]; then variants="dispatch general"; fi
+              for variant in $variants; do
+                export TRIVIAL_SIMD_STRIDED_VARIANT=$variant
+                export TRIVIAL_SIMD_STRIDED_OUTPUT="strided-profile/validation/$variant-$trial.csv"
+                ros -Q run --eval '(handler-case (load "tests/strided-bench.lisp") (error (condition) (format *error-output* "~A~%" condition) (uiop:quit 1)))'
+              done
+            done
+            python3 tests/strided-gates.py --variant dispatch --header x86-64 strided-profile/validation/*.csv > strided-profile/validated-header.h
+          else
+            cp strided-profile/candidate-header.h strided-profile/validated-header.h
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: strided-profile-x86-64
