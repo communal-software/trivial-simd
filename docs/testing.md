@@ -90,7 +90,11 @@ row strides, views with small staging buffers, overlap rejection, native-symbol
 fallback, spilling, redefinition and concurrent calls. C tests also check
 descriptor bounds, empty calls, allocation failure and scratch cleanup.
 BLAS Level 1 tests cover real and complex precisions, offsets, increments,
-errors, rotations, and convenience wrappers. They compare against an available
+errors, rotations, and convenience wrappers. Generic Level 1 tests cover f32,
+f16 and bf16 vectors and views, single-float results, nearest-even encoded
+stores, bit-preserving copy/swap, overlap, zero factors, scaled f32 norms,
+empty calls, validation before writes and conversion fallback. Run
+`examples/blas-encoded.lisp` for encoded arithmetic. Tests compare against an available
 system CBLAS (Accelerate on macOS, or OpenBLAS/BLAS on other platforms); only
 the reference comparison is skipped when no CBLAS is installed.
 Level 2 tests cover matrix views, layouts, packed and band storage, transpose,

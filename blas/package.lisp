@@ -1,7 +1,8 @@
 (defpackage #:trivial-simd/blas
   (:use #:cl)
   (:shadow #:aref)
-  (:export #:saxpy #:daxpy #:caxpy #:zaxpy
+  (:export #:axpy #:scal #:copy #:swap #:dot #:nrm2 #:asum #:iamax
+           #:saxpy #:daxpy #:caxpy #:zaxpy
            #:sswap #:dswap #:cswap #:zswap
            #:scopy #:dcopy #:ccopy #:zcopy
            #:sscal #:dscal #:cscal #:zscal #:csscal #:zdscal

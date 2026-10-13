@@ -50,7 +50,7 @@ unsigned-byte-16 vector, `:bf16` or `:f16`. The other operand may be
 Without an encoding keyword an `(unsigned-byte 16)` vector holds integers, as
 for any other conversion. Both encoding keywords convert between encoded
 formats. Identical encodings copy raw bits, including NaN payloads, and accept
-in-place use. Shifted overlap follows the [bulk overlap limitation](api.md#limitations).
+in-place use. Shifted overlap follows the [bulk overlap rules](api.md#overlap).
 
 ```lisp
 (trivial-simd:convert! halves doubles :destination-encoding :f16)

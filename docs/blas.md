@@ -12,6 +12,8 @@ loads without the convenience system.
 The [Level 1](blas-level1.md), [Level 2](blas-level2.md), and
 [Level 3](blas-level3.md) references list
 routines, arguments, returns, and precision variants. The
+[generic Level 1 routines](blas-level1.md#generic-f32-f16-and-bf16) cover f32
+and encoded f16/bf16 vectors. The
 [batched GEMM](blas-batches.md) reference covers constant-stride real batches. The
 [benchmarks](blas-benchmarks.md) compare Level 2 and 3 against system CBLAS.
 [Complex vectors](complex.md) describes their storage and scalar types.
