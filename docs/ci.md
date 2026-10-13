@@ -1,6 +1,6 @@
 # CI
 
-CI runs a small set of jobs automatically and the full Linux and Windows matrix on
+GitHub Actions runs a small set of jobs automatically and the full Linux and Windows matrix on
 request. macOS runs locally; see
 [local platform runs](testing.md#local-platform-runs). Lisp errors return a
 failing process status in Roswell test steps. SBCL jobs reserve a 4 GiB heap
@@ -49,12 +49,6 @@ Run the suite locally first; see [testing](testing.md). A local run on one
 platform catches most failures; dispatch a slice for the platform you cannot
 run.
 
-## Private mirror builds
-
-Private mirror pushes submit [`.build.yml`](../.build.yml) for Linux/SBCL checks.
-The automatic submission uses the mirror's SSH checkout URL and requires worker
-access to that repository. See the [checkout limitation](#limitations).
-
 ## Cost
 
 Private repositories bill macOS minutes at about ten times and Windows at about
@@ -88,10 +82,9 @@ See [the measurement method](encoded-matmul-performance.md).
 
 ## Limitations
 
-Automatic private-mirror builds fail during SSH checkout before any task runs.
-The committed manifest uses GitHub HTTPS, but automatic mirror submissions
-replace the checkout source. Worker checkout access is tracked in
-[#75](https://github.com/communal-software/trivial-simd/issues/75).
+CCL runs require local verification. Remaining x86-64 CCL test setup and
+lifetime-stress overhead is tracked in
+[#56](https://github.com/communal-software/trivial-simd/issues/56).
 
 [^focus]: Paths matching `native/`, `native.lisp`, `backends.lisp`,
     `kernel.lisp`, `kernel-math.lisp`, or `CMakeLists.txt`. The path lists are in the `paths`
