@@ -69,8 +69,8 @@ See [conversion and mask measurements](conversion-mask-performance.md).
 
 ## Limitations
 
-Deeply repeated native selection trees can underperform Lisp; see the
-[measured VM limitation](conversion-mask-performance.md#limitations).
+Native mask programs [share repeated pure expressions](kernel-sharing.md).
+See [complete-call measurements](conversion-mask-performance.md).
 
 Native numeric selection reducers use scalar execution below measured dispatch
 gates and for unmeasured combinations; see

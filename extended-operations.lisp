@@ -706,6 +706,7 @@ strides of DESTINATION then every operand, with NIL for scalars."
   (mask-reduction :all mask start end mask-start stride mask-stride))
 
 (defvar *kernel-operators*)
+(defvar *native-mask-sharing-p* t)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *mask-kernel-comparisons* '(= /= < <= > >=))
@@ -931,9 +932,9 @@ by a copy; see UNSHIFTED-KERNEL-INPUT."
            (programs (gensym "PROGRAMS")) (program (gensym "PROGRAM"))
            #+ecl (runners (gensym "RUNNERS"))
            (complex-kernel (gensym "COMPLEX-KERNEL"))
-           ;; TODO: repeated trees expand VM work; share pure subexpressions (#70).
            (lowered (multiple-value-list
                      (lower-kernel (mask-kernel-tree body arguments)
+                                   :share-p *native-mask-sharing-p*
                                    :lazy-select-p (member reduction *kernel-reducers*))))
            (bytes (kernel-bytes (first lowered)))
            (constants (second lowered)) (scratch-count (third lowered)))

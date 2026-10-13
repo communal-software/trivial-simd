@@ -578,6 +578,12 @@ benchmark or test jobs. See [method and results](mask-reducer-performance.md).
 
 ## Conversion and mask profiling
 
+Native mask sharing tests cover shared-value lifetimes, distinct spilling trees,
+wrapping arithmetic, selected float bits, lazy branch regions, error handling,
+views, exact aliases, and concurrent calls. See the
+[sharing profiler](kernel-sharing.md#measurement) for before/after complete-call
+timings and scratch copy traffic.
+
 The optional C profile compares explicit packed conversions and bulk comparisons
 with typed source loops, checking results before warmed calibrated medians.
 The Lisp profile measures complete conversion and mask-kernel calls, including

@@ -43,15 +43,50 @@ numeric conversion retains typed Lisp execution.
 
 At 65,536 elements:
 
-| Type | Bulk compare | Bulk select | Mask kernel | Select kernel | Count kernel | Repeated spilling kernel |
+| Type | Bulk compare | Bulk select | Mask kernel | Select kernel | Count kernel | Repeated selection kernel |
 |---|---:|---:|---:|---:|---:|---:|
-| f32 | 6.52× | 15.42× | 65.65× | 42.70× | 46.20× | 0.55× |
-| s8 | 52.55× | 41.77× | 136.17× | 96.37× | 109.42× | 1.03× |
-| u64 | 3.32× | 4.95× | 17.10× | 15.48× | 15.49× | 0.15× |
+| f32 | 6.52× | 15.42× | 65.65× | 42.70× | 46.20× | 15.44× |
+| s8 | 52.55× | 41.77× | 136.17× | 96.37× | 109.42× | 36.01× |
+| u64 | 3.32× | 4.95× | 17.10× | 15.48× | 15.49× | 5.87× |
 
-Byte-mask counting measures about 313× the Lisp loop. The repeated spilling
-kernel is a depth-seven selection tree followed by count. Its slower cases
-remain visible in the [limitations](#limitations).
+Byte-mask counting measures about 313× the Lisp loop. The repeated-tree column
+uses the sharing profile below. Its depth-seven selection tree followed by
+count shares pure nodes and executes without spilling.
+
+## Shared mask programs
+
+The [sharing lowerer](kernel-sharing.md) reduces the repeated selection/count
+program from 321 instructions to 11. At 65,536 elements, five-process median
+complete-call results are:
+
+| Type | Sharing disabled, pointer µs | Shared, pointer µs | Pointer speedup | Copy speedup |
+|---|---:|---:|---:|---:|
+| f32 | 2,698.25 | 91.94 | 29.27× | 14.89× |
+| s8 | 1,119.39 | 36.50 | 30.59× | 9.05× |
+| u64 | 7,430.00 | 224.69 | 33.04× | 23.43× |
+
+Every repeated selection case improves in all five runs at 32, 1,024, and
+65,536 elements, in both access modes. Nonrepeated selection, arithmetic, and
+lazy-reducer controls retain identical bytecode. Their largest median slowdown
+is 2.26%; none exceeds the 5% regression gate.
+
+The repeated program uses zero scratch slots and allocations. Sharing-disabled
+execution uses one spill, one reload, and one scratch allocation per call:
+
+| Type | Sharing-disabled peak scratch bytes | Sharing-disabled executed scratch copy bytes |
+|---|---:|---:|
+| f32 | 1,024 | 524,288 |
+| s8 | 256 | 131,072 |
+| u64 | 2,048 | 1,048,576 |
+
+Shared execution has zero scratch copy traffic for this case. Repeated arithmetic
+inside a lazy reducer shrinks from 15 instructions to 13 and retains one spill,
+one reload, and the same scratch allocation. At 65,536 elements, u64 measures
+1.34× pointer and 1.27× copy speedup over sharing-disabled lowering. The f32/s8
+median gains are about 1–2%, within the small variations between runs.[^sharing]
+
+See the [five-process raw measurements](benchmark-runs/2026-10-13-kernel-sharing-arm64.csv)
+and [reproduction commands](kernel-sharing.md#measurement).
 
 ## Emulated x86 calls
 
@@ -131,9 +166,9 @@ local costs; they do not predict physical Intel or AMD performance.[^versions][^
 
 ## Limitations
 
-Deeply repeated selection trees can execute more VM work than the Lisp
-baseline. Packed opcodes and scratch reuse do not remove that repeated work;
-sharing pure nodes is tracked in [#70](https://github.com/communal-software/trivial-simd/issues/70).
+Sharing does not cross lazy branch transitions; see the
+[sharing limitations](kernel-sharing.md#limitations). The sharing measurements
+cover Apple M1; physical x86 performance is unmeasured.
 
 Remaining conversion pairs, exceptional encoded lanes and platform-specific
 size gates are tracked in [#67](https://github.com/communal-software/trivial-simd/issues/67).
@@ -149,6 +184,16 @@ slower combinations retain scalar execution; see
 
 [^versions]: Release native builds use Apple Clang with CMake. Lisp measurements
     use SBCL 2.6.8. The test suite also covers CCL 1.13 and ECL 26.5.5.
+
+[^sharing]: The sharing profile uses five fresh SBCL 2.6.8 processes with inputs
+    2 and 1, alternating method order. Definitions, inputs, and outputs are
+    prepared outside timing; results are checked against Lisp. Each function is
+    warmed and measured with three calibrated batches of at least 50 ms. Tables
+    use median times and median per-process speedups. Lazy reducer profiles force
+    native dispatch to compare lowering; ordinary dispatch gates are unchanged.
+    A separately instrumented native library counts scratch allocations and
+    executed scratch copies outside timing. See the
+    [traffic accounting rules](kernel-sharing.md#measurement).
 
 [^inputs]: Lisp conversion inputs contain 127 in their declared integer type.
     Mask inputs contain 2 and 1, with predictable selections. Native C conversion

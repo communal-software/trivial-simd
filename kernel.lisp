@@ -47,19 +47,26 @@
                  (t (first operands)))))
         (t (error "Unsupported kernel expression ~S" expression))))
 
-(defun register-need (node)
-  (ecase (first node)
-    (:argument 0)
-    (:constant 1)
-    (:negate (max 1 (register-need (second node))))
-    (:unary (max 1 (register-need (third node))))
-    (:fma (loop for need in (sort (mapcar #'register-need (rest node)) #'>)
-                for held from 0 maximize (max 3 (+ held need))))
-    (:select (loop for need in (sort (mapcar #'register-need (rest node)) #'>)
+(defun register-need (node &optional cache)
+  (when cache
+    (multiple-value-bind (need known-p) (gethash node cache)
+      (when known-p (return-from register-need need))))
+  (let ((need
+          (ecase (first node)
+            (:argument 0)
+            (:constant 1)
+            (:negate (max 1 (register-need (second node) cache)))
+            (:unary (max 1 (register-need (third node) cache)))
+            ((:fma :select)
+             (loop for need in (sort (mapcar (lambda (child) (register-need child cache))
+                                            (rest node)) #'>)
                    for held from 0 maximize (max 3 (+ held need))))
-    (:operation (let ((left (register-need (third node)))
-                      (right (register-need (fourth node))))
-                  (max 1 (if (= left right) (1+ left) (max left right)))))))
+            (:operation
+             (let ((left (register-need (third node) cache))
+                   (right (register-need (fourth node) cache)))
+               (max 1 (if (= left right) (1+ left) (max left right))))))))
+    (when cache (setf (gethash node cache) need))
+    need))
 
 ;; TODO: 16-bit scratch indexes cap live slots at 65,536; widen bytecode (#32).
 (defun kernel-scratch-index (index)
@@ -67,9 +74,12 @@
     (error "Kernel scratch index ~D exceeds the 65,536-slot limit" index))
   index)
 
-(defun lower-kernel (tree &key lazy-select-p)
+(defun lower-kernel (tree &key lazy-select-p share-p)
   "Return instructions, constants, and scratch count. Instructions are (op dst a b).
 SPILL/RELOAD use a register and slot; other operands name registers or inputs."
+  (when share-p
+    (multiple-value-bind (code constants slots) (lower-shared-kernel tree lazy-select-p)
+      (when code (return-from lower-kernel (values code constants slots)))))
   (let ((free (loop for register below +kernel-registers+ collect register))
         (instructions '())
         (constants '())

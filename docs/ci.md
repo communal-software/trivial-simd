@@ -87,6 +87,7 @@ lifetime-stress overhead is tracked in
 [#56](https://github.com/communal-software/trivial-simd/issues/56).
 
 [^focus]: Paths matching `native/`, `native.lisp`, `backends.lisp`,
-    `kernel.lisp`, `kernel-math.lisp`, or `CMakeLists.txt`. The path lists are in the `paths`
-    section of the matrix file.
+    `kernel.lisp`, `kernel-math.lisp`, `kernel-fma-arm64.lisp`,
+    `kernel-sharing.lisp`, or `CMakeLists.txt`. The path lists are in the
+    `paths` section of the matrix file.
 [^cost]: GitHub's current rates are in its Actions billing documentation.
