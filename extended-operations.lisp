@@ -847,18 +847,44 @@ strides of DESTINATION then every operand, with NIL for scalars."
                         `(cffi:mem-ref ,result :size)
                         `(not (zerop (cffi:mem-ref ,result :size))))))))))
 
+  (defun native-mask-numeric-reduction-form (program foreign arguments offsets count reduction)
+    (let ((pointers (loop for nil in arguments collect (gensym "INPUT")))
+          (table (gensym "TABLE")))
+      `(with-native-vectors (,foreign ,(mapcar #'list pointers arguments offsets) :count ,count)
+         (cffi:with-foreign-object (,table :pointer ,(max 1 (length arguments)))
+           ,@(loop for pointer in pointers for i from 0
+                   collect `(setf (cffi:mem-aref ,table :pointer ,i) ,pointer))
+           ,(native-reduction-form program foreign table count reduction (length arguments))))))
+
   (defun mask-kernel-dispatch-form (scalar programs program slot bytes constants scratch-count
                                     key foreign kind reduction destination arguments
-                                    d-offset input-offsets count tree)
+                                    d-offset input-offsets count tree name)
     #+(and sbcl x86-64)
     (when *sbcl-simd-available-p*
       (let ((packed (sbcl-mask-form tree key kind reduction destination arguments input-offsets
                                    d-offset count scalar)))
         (setf scalar `(if (eq *backend* :sbcl) ,packed ,scalar))))
-    #-(and sbcl x86-64) (declare (ignore tree))
-    ;; TODO: numeric mask reducers stay scalar; route through native reducers (#69).
     (if (member reduction *kernel-reducers*)
-        scalar
+        (let ((result (gensym "RESULT")))
+          `(if (native-mask-reducer-eligible-p ',tree ,key ',reduction
+                                               (list ,@arguments) ,count ',(mask-reducer-expression-class tree)
+                                               ,(not (null (kernel-transcendental-p tree)))
+                                               ,(not (null (kernel-activation-math-p tree))))
+               (let* ((,program (or (aref ,programs ,slot)
+                                   (setf (aref ,programs ,slot)
+                                         (make-native-program ',bytes ',constants ,scratch-count ,key))))
+                      (,result (handler-case
+                                   (catch 'native-mask-replay
+                                     ,(native-mask-numeric-reduction-form
+                                       program foreign arguments input-offsets count reduction))
+                                 (arithmetic-error () :replay))))
+                 (if (eq ,result :replay)
+                     (let ((*backend* :lisp))
+                       (,name ,@arguments :end ,count
+                              ,@(loop for argument in arguments for offset in input-offsets
+                                      append (list (intern (format nil "~A-START" argument) :keyword) offset))))
+                     ,result))
+               ,scalar))
         `(if (eq *backend* :native)
              (let ((,program (or (aref ,programs ,slot)
                                  (setf (aref ,programs ,slot)
@@ -906,7 +932,9 @@ by a copy; see UNSHIFTED-KERNEL-INPUT."
            #+ecl (runners (gensym "RUNNERS"))
            (complex-kernel (gensym "COMPLEX-KERNEL"))
            ;; TODO: repeated trees expand VM work; share pure subexpressions (#70).
-           (lowered (multiple-value-list (lower-kernel (mask-kernel-tree body arguments))))
+           (lowered (multiple-value-list
+                     (lower-kernel (mask-kernel-tree body arguments)
+                                   :lazy-select-p (member reduction *kernel-reducers*))))
            (bytes (kernel-bytes (first lowered)))
            (constants (second lowered)) (scratch-count (third lowered)))
       (when (and reduction (/= 2 (length expression)))
@@ -943,7 +971,14 @@ by a copy; see UNSHIFTED-KERNEL-INPUT."
                 (if destination (cons 'destination-start starts) starts) count
                 `(if (complex-type-p ,type)
                      (and (native-complex-kernel-p) ,(not (eq reduction 'prod)))
-                     ,(if (member reduction *kernel-reducers*) nil '(eq *backend* :native)))
+                     ,(if (member reduction *kernel-reducers*)
+                          `(native-mask-reducer-eligible-p
+                            ',(mask-kernel-tree body arguments) ,type ',reduction
+                            (list ,@arguments) ,count
+                            ',(mask-reducer-expression-class (mask-kernel-tree body arguments))
+                            ,(not (null (kernel-transcendental-p body)))
+                            ,(not (null (kernel-activation-math-p body))))
+                          '(eq *backend* :native)))
                `(if (complex-type-p ,type)
                     (run-complex-expression ,complex-kernel ,type ,destination
                                             (list ,@arguments) (list ,@input-offsets) ,(if destination d-offset 0)
@@ -975,7 +1010,7 @@ by a copy; see UNSHIFTED-KERNEL-INPUT."
                                         ,destination)))
                                    programs program slot bytes constants scratch-count
                                    key foreign kind reduction destination arguments
-                                   d-offset input-offsets count (mask-kernel-tree body arguments)))
+                                   d-offset input-offsets count (mask-kernel-tree body arguments) name))
                               (error (condition)
                                 `(error ,(princ-to-string condition))))
                          collect

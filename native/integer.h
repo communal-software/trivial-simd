@@ -216,6 +216,8 @@ int ts_kernel_with_scratch_##suffix(const uint8_t *code, size_t code_length, con
                                    const type *const *inputs, type *out, size_t n, \
                                    size_t scratch_count, type *scratch, size_t capacity) { \
     if (n && scratch_count && (!scratch || capacity < scratch_count)) return -1; \
+    if (code_length && code[0] == TS_OP_LAZY) \
+        return ts_lazy_kernel_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch); \
     return ts_integer_kernel_##suffix(code, code_length, constants, inputs, out, n, scratch_count, 0, scratch); \
 } \
 int ts_kernel_sum_##suffix(const uint8_t *code, size_t code_length, const type *constants, \

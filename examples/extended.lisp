@@ -41,3 +41,10 @@
   (trivial-simd:compare! mask :gt floats 127.0)
   (trivial-simd:select! floats mask floats 0.0)
   (format t "Saturated bytes: ~S~%Selected floats: ~S~%" bytes floats))
+
+(trivial-simd:define-kernel selected-total (a b)
+  (trivial-simd:sum (trivial-simd:select (> a b) a (/ a b))))
+
+(let ((a (make-array 3 :element-type 'single-float :initial-contents '(4.0 1.0 6.0)))
+      (b (make-array 3 :element-type 'single-float :initial-contents '(0.0 2.0 0.0))))
+  (format t "Selected total: ~F~%" (selected-total a b))) ; => 10.5

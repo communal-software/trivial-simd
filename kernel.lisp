@@ -7,7 +7,8 @@
     (:multiply . 4) (:divide . 5) (:negate . 6) (:spill . 7) (:reload . 8)
     (:sqrt . 9) (:abs . 10) (:min . 11) (:max . 12) (:fma . 13)
     (:eq . 14) (:ne . 15) (:lt . 16) (:le . 17) (:gt . 18) (:ge . 19)
-    (:select . 20) (:exp . 21) (:sin . 22) (:cos . 23) (:log . 24) (:tanh . 25) (:sigmoid . 26)))
+    (:select . 20) (:exp . 21) (:sin . 22) (:cos . 23) (:log . 24) (:tanh . 25) (:sigmoid . 26)
+    (:lazy . 27) (:branch . 28) (:else . 29) (:end . 30)))
 
 (defconstant +kernel-output+ #xFF)
 (defconstant +kernel-input-base+ +kernel-registers+)
@@ -66,13 +67,14 @@
     (error "Kernel scratch index ~D exceeds the 65,536-slot limit" index))
   index)
 
-(defun lower-kernel (tree)
+(defun lower-kernel (tree &key lazy-select-p)
   "Return instructions, constants, and scratch count. Instructions are (op dst a b).
 SPILL/RELOAD use a register and slot; other operands name registers or inputs."
   (let ((free (loop for register below +kernel-registers+ collect register))
         (instructions '())
         (constants '())
         (scratch-free '())
+        (branch-free '())
         (scratch-count 0))
     (labels ((allocate ()
                (or (pop free)
@@ -101,8 +103,10 @@ SPILL/RELOAD use a register and slot; other operands name registers or inputs."
                  (values operand other)))
              (generate-many (nodes)
                (let ((operands (make-array (length nodes))) (held '()) (spilled '()))
-                 (dolist (index (stable-sort (loop for i below (length nodes) collect i)
-                                            #'> :key (lambda (i) (register-need (nth i nodes)))))
+                 (dolist (index (if lazy-select-p
+                                    (loop for i below (length nodes) collect i)
+                                    (stable-sort (loop for i below (length nodes) collect i)
+                                                 #'> :key (lambda (i) (register-need (nth i nodes))))))
                    (loop while (and held (> (register-need (nth index nodes)) (length free)))
                          for previous = (pop held)
                          do (let ((slot (scratch-slot)))
@@ -159,6 +163,29 @@ SPILL/RELOAD use a register and slot; other operands name registers or inputs."
                                  (release destination) +kernel-output+)
                           destination))))
                  (:select
+                  (when lazy-select-p
+                    (let* ((mask (generate (second node) nil))
+                           (slot (or (pop branch-free)
+                                     (prog1 scratch-count
+                                       (kernel-scratch-index (+ scratch-count 1))
+                                       (incf scratch-count 2)))))
+                      (emit :branch mask slot 0)
+                      (release mask)
+                      (let* ((on-true (generate (third node) nil))
+                             (saved (scratch-slot)))
+                        (emit :spill on-true saved 0)
+                        (release on-true)
+                        (emit :else 0 slot 0)
+                        (let* ((on-false (generate (fourth node) nil))
+                               (destination (destination-for top-p on-false)))
+                          (emit :copy destination on-false 0)
+                          (unless (eql destination on-false) (release on-false))
+                          (emit :else 1 slot 0)
+                          (emit :reload destination saved 0)
+                          (emit :end 0 slot 0)
+                          (push slot branch-free)
+                          (push saved scratch-free)
+                          (return-from generate destination)))))
                   (destructuring-bind (mask on-true on-false) (generate-many (rest node))
                     (let ((destination (if (register-p on-false) on-false (allocate))))
                       (unless (eql destination on-false)
@@ -173,7 +200,7 @@ SPILL/RELOAD use a register and slot; other operands name registers or inputs."
                  (:operation
                   (destructuring-bind (kind left right) (rest node)
                     (let (left-operand right-operand)
-                      (if (>= (register-need left) (register-need right))
+                      (if (or lazy-select-p (>= (register-need left) (register-need right)))
                           (multiple-value-setq (left-operand right-operand)
                             (generate-pair left right))
                           (multiple-value-setq (right-operand left-operand)
@@ -184,15 +211,49 @@ SPILL/RELOAD use a register and slot; other operands name registers or inputs."
                           (unless (eql operand destination) (release operand)))
                         destination)))))))
       (generate tree t))
-    (values (nreverse instructions) constants scratch-count)))
+    (values (if lazy-select-p (cons (list :lazy 0 0 0) (nreverse instructions))
+                (nreverse instructions)) constants scratch-count)))
 
 (defun kernel-bytes (instructions)
   (loop for (op destination a b) in instructions
-        append (if (member op '(:spill :reload))
+        append (if (member op '(:spill :reload :branch :else :end))
                    (let ((index (kernel-scratch-index a)))
                      (list (cdr (assoc op *kernel-opcodes*)) destination
                            (ldb (byte 8 0) index) (ldb (byte 8 8) index)))
                    (list (cdr (assoc op *kernel-opcodes*)) destination a b))))
+
+(defparameter *native-mask-reducer-architecture* (string-upcase (machine-type)))
+(defvar *native-mask-reducer-minimum-count* nil)
+(defvar *native-mask-reducer-gates* (make-hash-table :test #'equal))
+(defvar *native-mask-reducer-gate-floor* nil)
+
+(defun mask-reducer-expression-class (tree)
+  (labels ((arithmetic-p (node)
+             (case (first node)
+               ((:negate :unary :fma) t)
+               (:operation (or (not (member (second node) '(:eq :ne :lt :le :gt :ge)))
+                               (some #'arithmetic-p (cddr node))))
+               (:select (some #'arithmetic-p (rest node))))))
+    (cond ((> (register-need tree) +kernel-registers+) :spill)
+          ((arithmetic-p tree) :arithmetic)
+          (t :selection))))
+
+(defun native-mask-reducer-eligible-p (tree type reducer inputs count
+                                      &optional (class (mask-reducer-expression-class tree))
+                                        (transcendental-p (kernel-transcendental-p tree))
+                                        (activation-p (kernel-activation-math-p tree)))
+  (and (eq *backend* :native) *native-kernel-predication-p*
+       (or *native-mask-reducer-minimum-count*
+           (and *native-mask-reducer-gate-floor* (>= count *native-mask-reducer-gate-floor*)))
+       (<= (length inputs) +kernel-max-arguments+)
+       (not (and (integer-type-p type) (eq reducer 'nrm2)))
+       (or (not transcendental-p) *native-kernel-transcendentals-p*)
+       (or (not activation-p) *native-kernel-activation-math-p*)
+       (let* ((access (if (every #'vector-view-p inputs) :view *native-array-access*))
+              (key (list *native-mask-reducer-architecture* type reducer access class))
+              (gate (or *native-mask-reducer-minimum-count*
+                        (gethash key *native-mask-reducer-gates*))))
+         (and gate (>= count gate)))))
 
 (defun kernel-element-type (type)
   (second (numeric-type type)))
@@ -536,8 +597,8 @@ Empty slices give NIL for the extrema and a zero otherwise."
              `(when (plusp ,count)
                 ,(call (if (eq reducer 'argmin) 1 2))
                 (cffi:mem-ref ,index :size)))
-            (prod
-             `(progn ,(call 7)
+            ((sum prod)
+             `(progn ,(call (if (eq reducer 'sum) 8 7))
                      ,(if integerp
                           `(native-integer-result ,value ,foreign)
                           `(cffi:mem-ref ,value ,foreign))))

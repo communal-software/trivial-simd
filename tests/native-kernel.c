@@ -277,7 +277,7 @@ static void check_kernel_reduction_##suffix(void) { \
     assert(ts_kernel_reduction_##suffix(copy, sizeof(copy), NULL, inputs, 1, 4, 0, 0, 0, \
                                         &value, &wide, &index) == -1); \
     assert(ts_kernel_reduction_##suffix(copy, sizeof(copy), NULL, inputs, 1, 4, 0, \
-                                        TS_REDUCE_PROD + 1, 0, &value, &wide, &index) == -1); \
+                                        TS_REDUCE_SUM + 1, 0, &value, &wide, &index) == -1); \
     assert(ts_kernel_reduction_##suffix(copy, sizeof(copy), NULL, inputs, 257, 4, 0, \
                                         TS_REDUCE_ARGMIN, 0, &value, &wide, &index) == -1); \
     size_t before = allocations; \

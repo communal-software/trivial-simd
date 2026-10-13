@@ -21,7 +21,10 @@ and non-spilling calls allocate none. Scratch size depends on peak live slots,
 not vector length; spills and reloads operate on blocks of up to 256 elements.
 Mask-output and count/any/all kernel calls reuse that allocation across all
 blocks and release it after success or an error. Concurrent calls own separate
-scratch buffers.
+scratch buffers. Numeric selection reducers share one allocation for spills and
+nested branch masks per native invocation. Sequential branches reuse mask slots;
+mask storage depends on live nesting depth. Norm rescaling can invoke the native
+reducer more than once.[^selection]
 
 ## Storage comparison
 
@@ -85,3 +88,6 @@ workloads and cache prototype.
   [scratch addressing ticket](https://github.com/communal-software/trivial-simd/issues/32).
 - Setup dominates short non-spilling reductions. See the
   [call setup ticket](https://github.com/communal-software/trivial-simd/issues/34).
+
+[^selection]: Branch masks occupy two numeric scratch slots per live selection.
+    Spill/reload writes preserve inactive lanes. See [selection reductions](mask-reducers.md).

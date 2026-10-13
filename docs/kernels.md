@@ -106,6 +106,7 @@ for accumulation, and need no full-length intermediate result vector. Results
 may differ slightly by backend because the addition order differs.[^sum]
 `nrm2` of single-float inputs accumulates in double precision and rounds once.
 Ties keep the first element, matching the [bulk reductions](reductions.md#ties-and-signed-zeros).
+Selections preserve lazy branches; see [numeric selection reductions](mask-reducers.md).
 
 Float elementwise kernels and `sum`/`prod`/extrema kernels accept `:rows`, `:row-length`, and input row
 strides. Elementwise output stays positional; reduction output uses `:destination`.
@@ -193,10 +194,14 @@ for measurements and [FMA fallback limitations](#limitations).
 
 - Transcendental math uses scalar system routines. See its
   [numerical and execution limitations](kernel-transcendentals.md#limitations).
-- Real/integer mask expressions use scalar comparison and selection lanes in the native VM
-  and scalar loops on SBCL. Spilling mask reductions allocate scratch per
-  256-element block. Packed execution and scratch reuse are tracked in
-  the conversion and mask vectorization work.
+- Numeric selection reducers retain scalar execution where native complete calls
+  do not meet their measured gates. See [selection-reducer limitations](mask-reducers.md#limitations).
+  Further SBCL mask coverage is tracked in
+  [#68](https://github.com/communal-software/trivial-simd/issues/68).
+- The older real native VM uses zero subtraction for unary negation and loses
+  the negative sign when negating positive zero. The lazy selection-reducer
+  path uses sign negation. See
+  [#76](https://github.com/communal-software/trivial-simd/issues/76).
 - NaNs, infinities, non-default rounding modes, and floating-point traps may
   behave differently by backend. See the
   [IEEE consistency ticket](https://github.com/communal-software/trivial-simd/issues/33).

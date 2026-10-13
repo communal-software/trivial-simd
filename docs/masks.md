@@ -61,16 +61,20 @@ packed counting. Scalar tails retain the same results and empty identities.
 A spilling native mask call owns one scratch allocation across its 256-element
 blocks; concurrent calls have independent scratch.
 
-See [measurements and coverage](conversion-mask-performance.md).
+Numeric reducers also accept selections, including nested branches. See
+[numeric selection reductions](mask-reducers.md) for lazy evaluation and
+[complete-call measurements](mask-reducer-performance.md) for native dispatch.
+
+See [conversion and mask measurements](conversion-mask-performance.md).
 
 ## Limitations
 
 Deeply repeated native selection trees can underperform Lisp; see the
 [measured VM limitation](conversion-mask-performance.md#limitations).
 
-Numeric reductions over real/integer selections use scalar execution on every
-backend; native integration is tracked in
-[#69](https://github.com/communal-software/trivial-simd/issues/69).
+Native numeric selection reducers use scalar execution below measured dispatch
+gates and for unmeasured combinations; see
+[selection-reducer limitations](mask-reducers.md#limitations).
 SBCL s64/u64 masks and unsupported packed arithmetic also use scalar execution.
 Floating-point `any`/`all` kernels retain scalar short-circuit evaluation.
 Expressions whose packed

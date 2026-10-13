@@ -55,6 +55,16 @@ Row reducer tests cover all dtypes, logical arg indices, signed row strides, ide
 Kernel reducer tests compare `minimum`, `maximum`, `argmin`, `argmax`, `asum`
 and `nrm2` kernels with the bulk reducers on every backend, covering slices,
 block boundaries, ties, selections, spilling, complex vectors and overflow.
+Numeric selection-reducer tests cover all ten real/integer types, every reducer,
+integer norm rejection, wrapping boundaries, lazy division/domain/overflow errors,
+condition replay through direct views, pointer/copy modes, independent input starts,
+small staging blocks, first ties, signed zeros, extreme norms, mixed-mask spills,
+concurrent calls, capability fallback and dispatch-gate boundaries. The native
+harness checks SIMD/scalar builds, one scratch allocation per nonempty invocation,
+allocation failure, overflow checks, malformed branches and floating-point
+state restoration. [Reducer performance](mask-reducer-performance.md) records
+the complete-call gate measurements.
+
 Complex mask tests check both precisions, nested arithmetic and selections,
 mask and numeric reductions, dependent passes, slices, views, spilling,
 overlap, extreme norms, validation before writes, native dispatch, missing-symbol
@@ -546,6 +556,18 @@ Run the typed-loop versus kernel benchmark with
 `sbcl --non-interactive --load tests/activation-bench.lisp`. It reports per-call
 microseconds for log, tanh, sigmoid, SiLU and tanh-GELU at 32, 1,024 and 65,536 elements.
 See [activation measurements](activation-performance.md).
+
+## Numeric selection-reducer profiling
+
+```sh
+sbcl --dynamic-space-size 4096 --non-interactive --load tests/mask-reducers-bench.lisp
+MASK_REDUCER_GATED=1 sbcl --dynamic-space-size 4096 --non-interactive \
+  --load tests/mask-reducers-bench.lisp
+```
+
+The first command forces native candidates; the second measures normal dispatch,
+including scalar fallback. Run each in five fresh processes without concurrent
+benchmark or test jobs. See [method and results](mask-reducer-performance.md).
 
 ## Conversion and mask profiling
 

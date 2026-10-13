@@ -666,6 +666,13 @@ back for the POINTERs in OUTPUTS. A vector view binds its own memory instead."
   (if (consp tree) (some #'kernel-activation-math-p tree)
       (member tree '(log tanh sigmoid :log :tanh :sigmoid))))
 
+(define-native ("ts_kernel_predication" %native-kernel-predication) :int)
+
+(defvar *native-kernel-predication-p*
+  (and *native-available-p*
+       (ignore-errors (cffi:foreign-symbol-pointer "ts_kernel_predication"))
+       (= 1 (%native-kernel-predication))))
+
 (defstruct (native-program (:constructor %make-native-program))
   code code-length f32-constants f64-constants constants constant-type scratch-count scalar-constants
   #+ecl runner)
@@ -775,6 +782,7 @@ back for the POINTERs in OUTPUTS. A vector view binds its own memory instead."
     (-2 (error "Negative kernel square root operand"))
     (-3 (error 'division-by-zero :operation 'truncate :operands nil))
     (-4 (error "Invalid native kernel program or operands"))
+    (-5 (throw 'native-mask-replay :replay))
     (otherwise (error "Unable to allocate native kernel scratch storage"))))
 
 (defmacro define-native-kernel-dispatch ()
@@ -842,8 +850,8 @@ back for the POINTERs in OUTPUTS. A vector view binds its own memory instead."
 
 (defun call-native-kernel-reduction (program type inputs input-count count reducer scale
                                      value wide index)
-  "Run REDUCER (1 argmin, 2 argmax, 3 asum, 4 sum of squares, 5 largest magnitude,
-6 sum of squares divided by SCALE) over the program's values."
+  "Run REDUCER (1 minimum/argmin, 2 maximum/argmax, 3 asum, 4 sum of squares,
+5 largest magnitude, 6 scaled sum of squares, 7 prod, 8 sum) over program values."
   (with-kernel-program (program type)
     (unwind-protect
          (check-native-kernel-status

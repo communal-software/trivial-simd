@@ -1,4 +1,5 @@
 #include <math.h>
+#include <fenv.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -284,7 +285,8 @@ enum {
     TS_OP_MULTIPLY, TS_OP_DIVIDE, TS_OP_NEGATE, TS_OP_SPILL, TS_OP_RELOAD,
     TS_OP_SQRT, TS_OP_ABS, TS_OP_MIN, TS_OP_MAX, TS_OP_FMA,
     TS_OP_EQ, TS_OP_NE, TS_OP_LT, TS_OP_LE, TS_OP_GT, TS_OP_GE, TS_OP_SELECT,
-    TS_OP_EXP, TS_OP_SIN, TS_OP_COS, TS_OP_LOG, TS_OP_TANH, TS_OP_SIGMOID
+    TS_OP_EXP, TS_OP_SIN, TS_OP_COS, TS_OP_LOG, TS_OP_TANH, TS_OP_SIGMOID,
+    TS_OP_LAZY, TS_OP_BRANCH, TS_OP_ELSE, TS_OP_END
 };
 
 int ts_kernel_transcendentals(void) { return 1; }
@@ -300,9 +302,30 @@ static double ts_sigmoid_f64(double x) {
     return x < 0 ? z / (1.0 + z) : 1.0 / (1.0 + z);
 }
 
+int ts_kernel_predication(void) {
+    fenv_t environment;
+    if (feholdexcept(&environment)) return 0;
+    return fesetenv(&environment) == 0;
+}
+
 #define TS_KERNEL_BLOCK 256
 #define TS_KERNEL_REGISTERS 8
 #define TS_KERNEL_OUTPUT 0xFF
+
+#define TS_LAZY_DECLARATION(suffix, type) \
+static int ts_lazy_kernel_##suffix(const uint8_t *, size_t, const type *, \
+    const type *const *, type *, size_t, size_t, type *);
+TS_LAZY_DECLARATION(f32, float)
+TS_LAZY_DECLARATION(f64, double)
+TS_LAZY_DECLARATION(s8, uint8_t)
+TS_LAZY_DECLARATION(u8, uint8_t)
+TS_LAZY_DECLARATION(s16, uint16_t)
+TS_LAZY_DECLARATION(u16, uint16_t)
+TS_LAZY_DECLARATION(s32, uint32_t)
+TS_LAZY_DECLARATION(u32, uint32_t)
+TS_LAZY_DECLARATION(s64, uint64_t)
+TS_LAZY_DECLARATION(u64, uint64_t)
+#undef TS_LAZY_DECLARATION
 
 #define TS_KERNEL_LOOP(width, load, store, vector_op, scalar_op) \
     for (; i + width <= m; i += width) \
@@ -330,6 +353,7 @@ static double ts_sigmoid_f64(double x) {
 #include "kernel-vm.h"
 #include "masks.h"
 
+/* TODO: zero subtraction loses -0; use sign negation in the older VM (#76). */
 #define TS_KERNEL_RUN(suffix, mode, sum, type, width, load, store, zero, add, sub, mul, div, \
                       sqrtv, absv, minv, maxv, fmav, sqrts, abss, fmas) \
 static int ts_kernel_apply_##mode##_##suffix(unsigned op, type *destination, \
@@ -509,6 +533,8 @@ int ts_kernel_with_scratch_##suffix(const uint8_t *code, size_t code_length, \
                        const type *constants, const type *const *inputs, \
                        type *out, size_t n, size_t scratch_count, type *scratch, size_t capacity) { \
     if (n && scratch_count && (!scratch || capacity < scratch_count)) return -1; \
+    if (code_length && code[0] == TS_OP_LAZY) \
+        return ts_lazy_kernel_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch); \
     return ts_kernel_run_elementwise_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch); \
 } \
 int ts_kernel_sum_with_scratch_##suffix(const uint8_t *code, size_t code_length, \
@@ -526,6 +552,7 @@ TS_KERNEL(f64, double, TS_F64_VECTOR, TS_F64_WIDTH, TS_F64_LOAD, TS_F64_STORE, T
           TS_F64_SQRT, TS_F64_ABS, TS_F64_MIN, TS_F64_MAX, TS_F64_FMA, sqrt, fabs, fma)
 
 #include "integer.h"
+#include "kernel-lazy.h"
 
 
 #define TS_KERNEL_ROWS(suffix, type) \
@@ -604,13 +631,14 @@ TS_KERNEL_MASK(u64, uint64_t)
 
 /* Reducer codes for ts_kernel_reduction_*; Norm reducers are float-only. */
 enum { TS_REDUCE_ARGMIN = 1, TS_REDUCE_ARGMAX, TS_REDUCE_ASUM,
-       TS_REDUCE_SUMSQ, TS_REDUCE_MAXABS, TS_REDUCE_SCALED_SUMSQ, TS_REDUCE_PROD };
+       TS_REDUCE_SUMSQ, TS_REDUCE_MAXABS, TS_REDUCE_SCALED_SUMSQ, TS_REDUCE_PROD, TS_REDUCE_SUM };
 
 #define TS_REDUCE_FLOAT_OPERATIONS(suffix, type, absolute) \
 static int ts_reduce_less_##suffix(type x, type y) { return x < y; } \
 static int ts_reduce_greater_##suffix(type x, type y) { return x > y; } \
 static type ts_reduce_abs_##suffix(type x) { return absolute(x); } \
-static type ts_reduce_add_##suffix(type x, type y) { return x + y; }
+static type ts_reduce_add_##suffix(type x, type y) { return x + y; } \
+static type ts_reduce_sum_##suffix(const type *x, size_t n) { return ts_sum_##suffix(x, n); }
 
 #define TS_REDUCE_INTEGER_OPERATIONS(suffix, type) \
 static int ts_reduce_less_##suffix(type x, type y) { \
@@ -620,7 +648,8 @@ static int ts_reduce_greater_##suffix(type x, type y) { \
     return x != y && ts_value_##suffix(TS_OP_MAX, x, y) == x; \
 } \
 static type ts_reduce_abs_##suffix(type x) { return ts_value_##suffix(TS_OP_ABS, x, 0); } \
-static type ts_reduce_add_##suffix(type x, type y) { return ts_value_##suffix(TS_OP_ADD, x, y); }
+static type ts_reduce_add_##suffix(type x, type y) { return ts_value_##suffix(TS_OP_ADD, x, y); } \
+static type ts_reduce_sum_##suffix(const type *x, size_t n) { type result; ts_sum_##suffix(x, &result, n); return result; }
 
 /* Larger magnitudes report an out-of-range sum so callers can rescale. Clamping
  * keeps the multiply from overflowing, which traps under some hosts. */
@@ -653,8 +682,8 @@ static int ts_kernel_reduction_with_scratch_##suffix(const uint8_t *code, size_t
                                 const type *const *inputs, size_t input_count, size_t n, \
                               size_t scratch_count, unsigned reducer, double scale, \
                               type *value, double *wide, size_t *index, type *scratch) { \
-    if (reducer < TS_REDUCE_ARGMIN || reducer > TS_REDUCE_PROD || \
-        (integral && reducer > TS_REDUCE_ASUM && reducer != TS_REDUCE_PROD) || input_count > 256) return -1; \
+    if (reducer < TS_REDUCE_ARGMIN || reducer > TS_REDUCE_SUM || \
+        (integral && reducer > TS_REDUCE_ASUM && reducer != TS_REDUCE_PROD && reducer != TS_REDUCE_SUM) || input_count > 256) return -1; \
     if (scratch_count > SIZE_MAX / TS_KERNEL_BLOCK / sizeof(type)) return -1; \
     type best = 0, total = reducer == TS_REDUCE_PROD ? 1 : 0; \
     double accumulator = 0; \
@@ -672,6 +701,9 @@ static int ts_kernel_reduction_with_scratch_##suffix(const uint8_t *code, size_t
         switch (reducer) { \
         case TS_REDUCE_ARGMIN: TS_REDUCE_EXTREME(suffix, type, ts_reduce_less_##suffix) break; \
         case TS_REDUCE_ARGMAX: TS_REDUCE_EXTREME(suffix, type, ts_reduce_greater_##suffix) break; \
+        case TS_REDUCE_SUM: \
+            total = ts_reduce_add_##suffix(total, ts_reduce_sum_##suffix(values, m)); \
+            break; \
         case TS_REDUCE_PROD: \
             for (size_t j = 0; j < m; ++j) \
                 total = integral ? (type)((uint64_t)total * (uint64_t)values[j]) : total * values[j]; \
@@ -715,23 +747,42 @@ static int ts_kernel_reduction_with_scratch_##suffix(const uint8_t *code, size_t
             break; \
         } \
     } \
-    *value = (reducer == TS_REDUCE_ASUM || reducer == TS_REDUCE_PROD) ? total : best; \
+    *value = (reducer == TS_REDUCE_ASUM || reducer == TS_REDUCE_PROD || reducer == TS_REDUCE_SUM) ? total : best; \
     *wide = out_of_range ? HUGE_VAL : accumulator; \
     *index = best_index; \
     return 0; \
 }
 
 
+#if defined(__clang__)
+#define TS_REDUCER_FENV _Pragma("STDC FENV_ACCESS ON")
+#else
+#define TS_REDUCER_FENV
+#endif
+
 #define TS_KERNEL_REDUCTION_WRAPPER(suffix, type) \
 int ts_kernel_reduction_##suffix(const uint8_t *code, size_t code_length, const type *constants, \
                                 const type *const *inputs, size_t input_count, size_t n, \
                                 size_t scratch_count, unsigned reducer, double scale, \
                                 type *value, double *wide, size_t *index) { \
+    TS_REDUCER_FENV \
     if (scratch_count > SIZE_MAX / TS_KERNEL_BLOCK / sizeof(type)) return -1; \
-    type *scratch = scratch_count ? malloc(scratch_count * TS_KERNEL_BLOCK * sizeof(type)) : NULL; \
-    if (scratch_count && !scratch) return -1; \
+    int lazy = code_length && code[0] == TS_OP_LAZY; \
+    int allocate = scratch_count && (!lazy || n); \
+    type *scratch = allocate ? malloc(scratch_count * TS_KERNEL_BLOCK * sizeof(type)) : NULL; \
+    if (allocate && !scratch) return -1; \
+    if (lazy && n) { \
+        int validation = ts_lazy_validate(code, code_length, scratch_count, input_count, scratch, sizeof(type)); \
+        if (validation) { free(scratch); return validation; } \
+    } \
+    fenv_t environment; \
+    if (lazy && feholdexcept(&environment)) { free(scratch); return -5; } \
     int status = ts_kernel_reduction_with_scratch_##suffix(code, code_length, constants, inputs, \
         input_count, n, scratch_count, reducer, scale, value, wide, index, scratch); \
+    if (lazy) { \
+        int exceptions = fetestexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW); \
+        if (fesetenv(&environment) || exceptions || status == -2 || status == -3) status = -5; \
+    } \
     free(scratch); \
     return status; \
 }

@@ -23,6 +23,7 @@ to an expression.
 (trivial-simd:sum singles :accumulate :f64) ; => double-float
 ```
 
+Kernel reducers accept lazy numeric selections; see [selection reductions](mask-reducers.md).
 Row-batched kernel reductions write one result per row; see [row batches](kernel-rows.md).
 
 ## Empty slices

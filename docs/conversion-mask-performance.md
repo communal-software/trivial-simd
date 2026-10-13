@@ -142,8 +142,10 @@ Additional in-process SBCL conversions and 64-bit masks are tracked in
 Local CCL x86-64 verification is subject to the
 [Rosetta testing limitations](testing.md#limitations).
 
-Numeric reductions over mask expressions retain scalar dispatch; native
-integration is tracked in [#69](https://github.com/communal-software/trivial-simd/issues/69).
+Numeric selection reductions have separate native dispatch gates and
+[complete-call measurements](mask-reducer-performance.md). Unmeasured and
+slower combinations retain scalar execution; see
+[selection-reducer limitations](mask-reducers.md#limitations).
 
 [^versions]: Release native builds use Apple Clang with CMake. Lisp measurements
     use SBCL 2.6.8. The test suite also covers CCL 1.13 and ECL 26.5.5.
