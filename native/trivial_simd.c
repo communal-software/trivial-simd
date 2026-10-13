@@ -891,4 +891,5 @@ TS_FILL(u64, uint64_t)
 
 #ifdef TS_ND_ENABLED
 #include "nd.h"
+#include "strided.h"
 #endif

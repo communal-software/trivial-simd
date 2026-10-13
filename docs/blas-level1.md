@@ -50,10 +50,11 @@ vectors. Without `:end`, paired vectors have equal lengths.
 
 Complex `asum` and `i?amax` and the real-factor scales `csscal` and `zdscal` use
 scalar loops; native complex reductions are tracked by
-[#45](https://github.com/communal-software/trivial-simd/issues/45). Nonunit increments
-[gather into temporaries](api.md#limitations), tracked by
-[#49](https://github.com/communal-software/trivial-simd/issues/49). Shifted overlap
-between input and output spans follows the [overlap limitation](api.md#limitations).
+[#45](https://github.com/communal-software/trivial-simd/issues/45). Nonunit core
+increments use [direct strided execution](strided-performance.md) on `:native`;
+other backends retain staging. Core calls apply the
+[bulk overlap rules](api.md#overlap); other BLAS routines retain the
+[overlap limitation](blas.md#limitations).
 
 [^rotm]: The flag in the first parameter element selects which matrix entries
     are active. The other four elements follow the reference BLAS order

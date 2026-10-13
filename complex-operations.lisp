@@ -112,6 +112,9 @@
         (resolve-mixed-slice (list destination input)
                              (list destination-start input-start) start end
                              (list destination-stride input-stride) stride)
+      (when (and strides (direct-strided-p strides))
+        (return-from complex-magnitude!
+          (strided-bulk :abs destination (list input) count offsets strides)))
       (destructuring-bind (d-offset i-offset) offsets
         (with-bulk-staged ((destination d-offset (first strides) :out)
                            (input i-offset (second strides)))

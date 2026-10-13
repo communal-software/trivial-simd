@@ -44,16 +44,21 @@ The `-stride` keywords step through a slice; see [strides](api.md#strides).
 
 ## Backends
 
+The table describes unit-stride calls.
+
 | Operation | `:native` | `:sbcl`, `:lisp` |
 |---|---|---|
 | `copy!` | `replace` | `replace` |
 | `fill!` | C fill from 4,096 bytes upward;[^threshold] otherwise `fill` | `fill` |
 | `swap!` | C block swap from 64 bytes upward;[^threshold] otherwise a typed loop | Typed loop |
 
-Complex vectors, and native calls in `:copy` array-access mode, use the Lisp
-forms. Strided calls gather, run the contiguous operation, and scatter.
+Unit-stride complex vectors and native calls in `:copy` array-access mode use
+the Lisp forms. Non-unit strides on `:native` traverse storage directly: C
+transfers with pointer access, typed Lisp loops for copied arrays, and direct
+Lisp access for mixed storage. Other backends retain gathering. See
+[strided execution](strided-performance.md).
 
-[^overlap]: Shifted overlaps are snapshotted before gathering or block staging,
+[^overlap]: Shifted overlaps are snapshotted before direct execution or staging,
     including views sharing foreign memory. The contiguous Lisp path uses
     `replace`; see the [bulk overlap contract](api.md#overlap).
 [^threshold]: Native calls cost about 0.2 µs to set up, so they only win

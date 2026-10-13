@@ -63,7 +63,8 @@ same rules on their parts.[^nrm2]
 | `:native` | Lane partial sums, lanes added in order, then the tail |
 
 Widened `single-float` sums on `:native` use four double-precision lanes on
-every CPU.
+every CPU. Non-unit strides through copied arrays and direct Lisp fallbacks use
+element order.
 
 ## Limitations
 
@@ -77,5 +78,6 @@ every CPU.
 [^order]: Floating-point results can differ between backends in the last bits.
     `argmin`, `argmax`, `minimum` and `maximum` do not.
 [^placeholder]: SBCL and all integer vectors use typed scalar loops for
-    `asum`, `argmin` and `argmax`. Native float `argmin` and `argmax` scan
+    `asum`, `argmin` and `argmax` on contiguous calls. Native non-unit strides
+    use packed integer reductions and extreme-index comparisons. Native float `argmin` and `argmax` scan
     32-element blocks and skip blocks that cannot improve the result.

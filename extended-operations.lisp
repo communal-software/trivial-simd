@@ -298,6 +298,9 @@ strides of DESTINATION then every operand, with NIL for scalars."
       (extended-slice destination (list input) (list input-start) start end destination-start
                       :operand-strides (list input-stride) :stride stride
                       :destination-stride destination-stride)
+    (when (and strides (direct-strided-p strides))
+      (return-from extended-unary
+        (strided-bulk operation destination (list input) count offsets strides)))
     (destructuring-bind (d-offset i-offset) offsets
      (with-bulk-staged ((destination d-offset (first strides) :out)
                         (input i-offset (second strides)))
@@ -355,6 +358,9 @@ strides of DESTINATION then every operand, with NIL for scalars."
                       :operand-strides (list l-stride r-stride) :stride stride
                       :destination-stride d-stride)
     (declare (ignore type))
+    (when (and strides (direct-strided-p strides))
+      (return-from extended-minmax
+        (strided-bulk operation destination (list left right) count offsets strides)))
     (destructuring-bind (d-offset l-offset r-offset) offsets
       (with-bulk-staged ((destination d-offset (first strides) :out)
                          (left l-offset (second strides))
@@ -391,6 +397,9 @@ strides of DESTINATION then every operand, with NIL for scalars."
                       :operand-strides (list input-stride lower-stride upper-stride)
                       :stride stride :destination-stride destination-stride)
     (declare (ignore type))
+    (when (and strides (direct-strided-p strides))
+      (return-from clamp!
+        (strided-bulk :clamp destination (list input lower upper) count offsets strides)))
     (destructuring-bind (d-offset i-offset l-offset u-offset) offsets
       (with-bulk-staged ((destination d-offset (first strides) :out)
                          (input i-offset (second strides))
@@ -514,6 +523,10 @@ strides of DESTINATION then every operand, with NIL for scalars."
           (resolve-mixed-slice (list destination input)
                                (list destination-start input-start) start end
                                (list destination-stride input-stride) stride)
+        (when (and strides (direct-strided-p strides))
+          (return-from convert!
+            (strided-bulk :convert destination (list input) count offsets strides :rounding rounding
+                          :destination-encoding destination-encoding :input-encoding input-encoding)))
         (destructuring-bind (d-offset i-offset) offsets
           (with-bulk-staged ((destination d-offset (first strides) :out)
                              (input i-offset (second strides)))
@@ -620,6 +633,9 @@ strides of DESTINATION then every operand, with NIL for scalars."
                         :operand-strides (list left-stride right-stride)
                         :stride stride :destination-stride mask-stride)
       (declare (ignore resolved))
+      (when (and strides (direct-strided-p strides))
+        (return-from compare!
+          (strided-bulk :compare mask (list left right) count offsets strides :operator operator)))
       (destructuring-bind (m-offset l-offset r-offset) offsets
         (with-bulk-staged ((mask m-offset (first strides) :out)
                            (left l-offset (second strides))
@@ -651,6 +667,9 @@ strides of DESTINATION then every operand, with NIL for scalars."
                       :mask-operand 0
                       :operand-strides (list mask-stride true-stride false-stride)
                       :stride stride :destination-stride destination-stride)
+    (when (and strides (direct-strided-p strides))
+      (return-from select!
+        (strided-bulk :select destination (list mask on-true on-false) count offsets strides)))
     (destructuring-bind (d-offset m-offset t-offset f-offset) offsets
       (with-bulk-staged ((destination d-offset (first strides) :out)
                          (mask m-offset (second strides))
@@ -679,6 +698,8 @@ strides of DESTINATION then every operand, with NIL for scalars."
   (unless (eq (vector-type mask) :u8) (error "Mask must be an unsigned-byte-8 vector"))
   (multiple-value-bind (length offsets strides)
       (resolve-mixed-slice (list mask) (list mask-start) start end (list mask-stride) stride)
+    (when (and strides (direct-strided-p strides))
+      (return-from mask-reduction (strided-reduce operation (list mask) length offsets strides nil)))
     (let ((offset (first offsets)))
       (with-staged ((mask offset (first strides)))
           (length :direct (eq *backend* :native)

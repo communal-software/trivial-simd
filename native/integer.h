@@ -17,23 +17,50 @@ TS_INTEGER_VECTOR(u16, uint16_t, 16, uint16x8_t, vld1q_u16, vst1q_u16, vaddq_u16
 TS_INTEGER_VECTOR(u32, uint32_t, 32, uint32x4_t, vld1q_u32, vst1q_u32, vaddq_u32, vsubq_u32, vmulq_u32)
 static size_t ts_vector_u64(unsigned op, uint64_t *out, const uint64_t *a,
                             const uint64_t *b, size_t n) {
-    if (op != TS_OP_ADD && op != TS_OP_SUBTRACT) return 0;
+    if (op != TS_OP_ADD && op != TS_OP_SUBTRACT && op != TS_OP_MULTIPLY) return 0;
     size_t i = 0;
     for (; i + 2 <= n; i += 2) {
         uint64x2_t x = vld1q_u64(a + i), y = vld1q_u64(b + i);
-        vst1q_u64(out + i, op == TS_OP_ADD ? vaddq_u64(x, y) : vsubq_u64(x, y));
+        uint64x2_t z;
+        if (op == TS_OP_ADD) z = vaddq_u64(x, y);
+        else if (op == TS_OP_SUBTRACT) z = vsubq_u64(x, y);
+        else {
+            uint32x2_t low_x = vmovn_u64(x), low_y = vmovn_u64(y);
+            uint32x2_t cross = vadd_u32(vmul_u32(vmovn_u64(vshrq_n_u64(x, 32)), low_y),
+                                       vmul_u32(low_x, vmovn_u64(vshrq_n_u64(y, 32))));
+            z = vaddq_u64(vmull_u32(low_x, low_y), vshlq_n_u64(vmovl_u32(cross), 32));
+        }
+        vst1q_u64(out + i, z);
     }
     return i;
 }
 #elif !defined(TS_SCALAR) && (defined(__x86_64__) || defined(_M_X64))
+static __m128i ts_integer_multiply(__m128i x, __m128i y, unsigned bits) {
+    if (bits == 8) {
+        __m128i mask = _mm_set1_epi16(255);
+        __m128i low = _mm_and_si128(_mm_mullo_epi16(x, y), mask);
+        __m128i high = _mm_slli_epi16(_mm_mullo_epi16(_mm_srli_epi16(x, 8), _mm_srli_epi16(y, 8)), 8);
+        return _mm_or_si128(low, high);
+    }
+    if (bits == 16) return _mm_mullo_epi16(x, y);
+    __m128i low = _mm_mul_epu32(x, y);
+    if (bits == 32) {
+        __m128i high = _mm_mul_epu32(_mm_srli_epi64(x, 32), _mm_srli_epi64(y, 32));
+        return _mm_unpacklo_epi32(_mm_shuffle_epi32(low, _MM_SHUFFLE(2, 0, 2, 0)),
+                                  _mm_shuffle_epi32(high, _MM_SHUFFLE(2, 0, 2, 0)));
+    }
+    __m128i cross = _mm_add_epi64(_mm_mul_epu32(_mm_srli_epi64(x, 32), y),
+                                  _mm_mul_epu32(x, _mm_srli_epi64(y, 32)));
+    return _mm_add_epi64(low, _mm_slli_epi64(cross, 32));
+}
 #define TS_INTEGER_VECTOR(suffix, type, bits, add, sub) \
 static size_t ts_vector_##suffix(unsigned op, type *out, const type *a, const type *b, size_t n) { \
     size_t i = 0; \
-    if (op != TS_OP_ADD && op != TS_OP_SUBTRACT && (op != TS_OP_MULTIPLY || bits != 16)) return 0; \
+    if (op != TS_OP_ADD && op != TS_OP_SUBTRACT && op != TS_OP_MULTIPLY) return 0; \
     for (; i + 128 / bits <= n; i += 128 / bits) { \
         __m128i x = _mm_loadu_si128((const __m128i *)(a + i)); \
         __m128i y = _mm_loadu_si128((const __m128i *)(b + i)); \
-        __m128i z = op == TS_OP_ADD ? add(x, y) : op == TS_OP_SUBTRACT ? sub(x, y) : _mm_mullo_epi16(x, y); \
+        __m128i z = op == TS_OP_ADD ? add(x, y) : op == TS_OP_SUBTRACT ? sub(x, y) : ts_integer_multiply(x, y, bits); \
         _mm_storeu_si128((__m128i *)(out + i), z); \
     } \
     return i; \

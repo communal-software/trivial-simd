@@ -1,8 +1,8 @@
 #include <stddef.h>
 
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if !defined(TS_SCALAR) && (defined(__aarch64__) || defined(_M_ARM64))
 #include <arm_neon.h>
-#elif defined(__x86_64__) || defined(_M_X64)
+#elif !defined(TS_SCALAR) && (defined(__x86_64__) || defined(_M_X64))
 #include <emmintrin.h>
 #include <xmmintrin.h>
 #endif
@@ -10,7 +10,7 @@
 void ts_complex_binary_c32(unsigned op, float *out, const float *left,
                            const float *right, size_t n) {
     size_t i = 0;
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if !defined(TS_SCALAR) && (defined(__aarch64__) || defined(_M_ARM64))
     for (; i + 4 <= n; i += 4) {
         float32x4x2_t a = vld2q_f32(left + 2 * i);
         float32x4x2_t b = vld2q_f32(right + 2 * i);
@@ -29,7 +29,7 @@ void ts_complex_binary_c32(unsigned op, float *out, const float *left,
         }
         vst2q_f32(out + 2 * i, r);
     }
-#elif defined(__x86_64__) || defined(_M_X64)
+#elif !defined(TS_SCALAR) && (defined(__x86_64__) || defined(_M_X64))
     for (; i + 2 <= n; i += 2) {
         __m128 a = _mm_loadu_ps(left + 2 * i);
         __m128 b = _mm_loadu_ps(right + 2 * i);
@@ -59,7 +59,7 @@ void ts_complex_binary_c32(unsigned op, float *out, const float *left,
 void ts_complex_binary_c64(unsigned op, double *out, const double *left,
                            const double *right, size_t n) {
     size_t i = 0;
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if !defined(TS_SCALAR) && (defined(__aarch64__) || defined(_M_ARM64))
     for (; i + 2 <= n; i += 2) {
         float64x2x2_t a = vld2q_f64(left + 2 * i);
         float64x2x2_t b = vld2q_f64(right + 2 * i);
@@ -78,7 +78,7 @@ void ts_complex_binary_c64(unsigned op, double *out, const double *left,
         }
         vst2q_f64(out + 2 * i, r);
     }
-#elif defined(__x86_64__) || defined(_M_X64)
+#elif !defined(TS_SCALAR) && (defined(__x86_64__) || defined(_M_X64))
     for (; i < n; ++i) {
         __m128d a = _mm_loadu_pd(left + 2 * i);
         __m128d b = _mm_loadu_pd(right + 2 * i);

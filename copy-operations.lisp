@@ -70,6 +70,9 @@ Overlapping slices of one vector copy as if SOURCE were read first."
       (resolve-slice (list destination source) (list destination-start source-start)
                      start end (list destination-stride source-stride) stride)
     (declare (ignore type))
+    (when (and strides (direct-strided-p strides))
+      (return-from copy!
+        (strided-bulk :copy destination (list source) count offsets strides)))
     (destructuring-bind (destination-offset source-offset) offsets
       (with-bulk-staged ((destination destination-offset (first strides) :out)
                          (source source-offset (second strides)))
@@ -85,6 +88,9 @@ Overlapping slices of one vector copy as if SOURCE were read first."
       (resolve-slice (list destination) (list nil) start end nil stride)
     (unless (typep value (second (numeric-type type)))
       (error 'type-error :datum value :expected-type (second (numeric-type type))))
+    (when (and strides (direct-strided-p strides))
+      (return-from fill!
+        (strided-bulk :fill destination (list value) count offsets strides)))
     (let ((offset (first offsets)))
       (with-staged ((destination offset (first strides) :out))
           (count :direct (native-copy-p type count +native-fill-minimum-bytes+))
@@ -102,6 +108,9 @@ Overlapping slices of one vector copy as if SOURCE were read first."
       (case (slice-overlap x x-offset (first strides) y y-offset (second strides) count)
         (:same (return-from swap! (values x y)))
         (:overlap (error "SWAP! output slices overlap")))
+      (when (and strides (direct-strided-p strides))
+        (strided-bulk :swap x (list y) count offsets strides)
+        (return-from swap! (values x y)))
       (with-staged ((x x-offset (first strides) :in-out)
                     (y y-offset (second strides) :in-out))
           (count :direct (native-copy-p type count +native-swap-minimum-bytes+))

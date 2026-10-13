@@ -22,6 +22,8 @@
                (:file "reductions")
                (:file "copy-operations")
                (:file "nd")
+               (:file "strided-lisp")
+               (:file "strided-execution")
                (:file "kernel")
                (:file "kernel-sharing")
                (:file "mask-reducer-gates")

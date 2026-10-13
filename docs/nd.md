@@ -64,7 +64,6 @@ Adjacent compatible axes are coalesced. Ordinary execution allocates layout meta
 |---|---|
 | Irregular output uniqueness may use O(element count) workspace | [#63](https://github.com/communal-software/trivial-simd/issues/63) |
 | Short calls pay fixed layout setup and validation overhead | [#65](https://github.com/communal-software/trivial-simd/issues/65) |
-| Existing 1-D strided APIs retain their separate staging paths | [#49](https://github.com/communal-software/trivial-simd/issues/49) |
 
 [^bounds]: Dimensions, starts, counts and stride arithmetic must fit the host's fixnum range and signed 64-bit native metadata. Byte stride/span arithmetic is checked as well. Empty layouts need no reachable storage, but their metadata still has to fit these ranges.
 [^native]: C traversal uses typed scalar loads for irregular strides. Implementations without pinned array access retain conservative mixed-storage snapshots. Native execution requires direct pointer access; otherwise the API uses Lisp rather than copying arrays into native buffers. The floating-point environment and numerical error behavior follow the corresponding bulk operation.

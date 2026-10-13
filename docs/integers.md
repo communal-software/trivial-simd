@@ -59,9 +59,11 @@ in-place rules match the [bulk API](api.md#slices).
 |---|---|
 | `:lisp` | Typed scalar arithmetic |
 | `:sbcl` on x86-64 | SSE2 add/subtract and packed kernels where the instruction is available; typed scalar paths for other operations |
-| `:native` on x86-64 | SSE2 add/subtract and 16-bit multiply; typed scalar paths for other operations |
-| `:native` on ARM64 | NEON add/subtract and 8/16/32-bit multiply; typed scalar paths for other operations |
+| `:native` on x86-64 | SSE2 add/subtract and wrapping multiply at every width; scalar division |
+| `:native` on ARM64 | NEON add/subtract and wrapping multiply at every width; scalar division |
 
+Native non-unit strides also pack unary arithmetic, bounded arithmetic,
+comparisons, selection, sums, products, dot products and extreme-index scans.
 The native backend uses scalar integer operations on other architectures.
 Copy mode supports all eight types. Integer division runs lane by lane on all
 backends. These fallback paths preserve the same wrapping results.[^reduction]
@@ -89,7 +91,7 @@ or Lisp. See [the ARM64 SBCL ticket](https://github.com/communal-software/trivia
 
 Integer kernels read every input before writing; see
 [kernel overlap](kernels.md#overlap). Shifted overlap in bulk integer operations
-follows the [bulk overlap limitation](api.md#limitations).
+uses the [bulk overlap snapshots](api.md#overlap).
 
 [^dispatch]: A kernel can serve floats and integers. Type-dependent validation
     happens at call time, including for empty vectors. An integer type rejects

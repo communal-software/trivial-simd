@@ -16,7 +16,13 @@ Real BLAS Level 2 and 3 routines also use [native kernels](blas-benchmarks.md)
 when the library exports them; an older library without the symbols, the
 `:lisp` backend, or copied array access selects the Lisp kernels.
 Complex add, subtract, and multiply use interleaved SIMD buffers on the native
-backend for longer vectors; other complex calls use Lisp arithmetic.
+backend for longer vectors. Non-unit strides also use native complex scale,
+AXPY, sum, product and dot reducers when storage supports direct pointers;
+other complex calls use Lisp arithmetic.
+
+Non-unit 1-D strides on `:native` use direct C traversal with pointer access,
+typed Lisp loops for copied arrays, and direct Lisp access for mixed storage.
+See [strided execution](strided-performance.md).
 SBCL on ARM64 selects the C backend when built, or the Lisp fallback otherwise.
 
 ## Tested combinations

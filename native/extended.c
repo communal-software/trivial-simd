@@ -500,6 +500,24 @@ int ts_extended_mask_reduce(unsigned op, const uint8_t *mask, size_t n, size_t *
     return 0;
 }
 
+uint64_t ts_strided_mask_reduce(unsigned op, const uint8_t *mask, size_t n, int64_t stride) {
+    if (op > 2 || !stride || (n && !mask)) return UINT64_MAX;
+    size_t total = 0, i = 0;
+    for (; n - i >= 16; i += 16) {
+        uint8_t values[16];
+        for (size_t j = 0; j < 16; ++j) values[j] = mask[(int64_t)(i + j) * stride];
+        size_t partial = ts_mask_count(values, 16);
+        if ((op == 1 && partial) || (op == 2 && partial != 16)) return op == 1;
+        total += partial;
+    }
+    for (; i < n; ++i) {
+        int truth = mask[(int64_t)i * stride] != 0;
+        if ((op == 1 && truth) || (op == 2 && !truth)) return op == 1;
+        total += truth;
+    }
+    return op == 0 ? total : op == 1 ? total != 0 : total == n;
+}
+
 unsigned ts_extended_encoded_conversion_rounding_modes(void) { return 0xfu; }
 
 static uint16_t ts_f64_bits_to_encoded(uint64_t bits, int f16, int rounding) {

@@ -6,6 +6,8 @@
   "Return the product of the logical input slice, or typed one when empty."
   (multiple-value-bind (type count offsets strides)
       (resolve-slice (list input) (list input-start) start end (list input-stride) stride)
+    (when (and strides (direct-strided-p strides))
+      (return-from prod (strided-reduce :prod (list input) count offsets strides nil)))
     (let ((offset (first offsets)))
       (with-staged ((input offset (first strides)))
           (count :direct (and (eq *backend* :native) *native-row-reducers-p*

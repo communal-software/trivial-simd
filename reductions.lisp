@@ -87,6 +87,8 @@
 (defun absolute-argmax (input count offset &optional (stride 1))
   "Index in INPUT of the first element of largest magnitude among COUNT > 0 real
 floats at STRIDE."
+  (when (and stride (/= stride 1) (eq *backend* :native))
+    (return-from absolute-argmax (strided-reduce :iamax (list input) count (list offset) (list stride))))
   (flet ((contiguous (input count offset)
            (if (eq *backend* :native)
                (native-iamax input count offset)
@@ -115,6 +117,8 @@ floats at STRIDE."
       (resolve-slice (list input) (list input-start) start end (list input-stride) stride)
     (when (complex-type-p type)
       (error "~A requires real vectors" name))
+    (when (and strides (direct-strided-p strides))
+      (return-from argext (strided-reduce (if maximum-p :argmax :argmin) (list input) count offsets strides nil)))
     (unless (zerop count)
       (let ((offset (first offsets)) (stride (first strides)))
         (if (and (vectorp input) (member stride '(nil 1)))
@@ -152,6 +156,8 @@ floats at STRIDE."
       (resolve-slice (list input) (list input-start) start end (list input-stride) stride)
     (let ((wide (wide-accumulation-p type accumulate))
           (offset (first offsets)))
+      (when (and strides (direct-strided-p strides))
+        (return-from asum (strided-reduce :asum (list input) count offsets strides wide)))
       (with-staged ((input offset (first strides)))
           (count :direct (and (eq *backend* :native) (member type '(:f32 :f64)))
                  :combine (sum-combiner type))
@@ -205,6 +211,8 @@ scaled to avoid overflow and underflow."
       (error "NRM2 requires float or complex vectors"))
     (let ((wide (wide-accumulation-p type accumulate))
           (offset (first offsets)))
+      (when (and strides (direct-strided-p strides))
+        (return-from nrm2 (strided-reduce :nrm2 (list input) count offsets strides wide)))
       (let ((norm (with-staged ((input offset (first strides)))
                       ;; DOT reads an f32 view itself.
                       (count :direct (eq type :f32) :combine #'norm-combiner)

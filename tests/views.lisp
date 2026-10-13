@@ -758,3 +758,29 @@ subnormal difference, which traps on Lisps that enable underflow traps."
                                (simd:convert! d i :input-encoding encoding :rounding rounding
                                                  :destination-encoding (if (eq encoding :bf16) :f16 :bf16)))
                              (list (blank '(unsigned-byte 16) length) encoded))))))))))
+
+(test native-strided-views-do-not-stage
+  (when simd::*native-available-p*
+    (with-backend (:native)
+      (with-view-memory
+        (let* ((a (mirror (make-array 600 :element-type 'single-float :initial-element 1f0)))
+               (b (make-array 600 :element-type 'single-float :initial-element 2f0))
+               (out (mirror b))
+               (names '(simd::gather-slice simd::scatter-slice simd::stage-in simd::stage-out
+                        simd::staging-buffer simd::copy-to-foreign simd::copy-from-foreign))
+               (functions (mapcar #'symbol-function names)))
+          (unwind-protect
+               (progn
+                 (dolist (name names)
+                   (setf (symbol-function name) (lambda (&rest arguments)
+                                                 (declare (ignore arguments))
+                                                 (error "Unexpected strided view staging"))))
+                 (dolist (mode '(:pointer :copy))
+                   (let ((simd::*native-array-access* mode))
+                     (simd:add! out a b :end 257 :left-start 512 :left-stride -2 :destination-stride 2)
+                     (dotimes (i 257) (is (= 3f0 (simd::vector-ref out (* i 2)))))
+                     (is (= 257f0 (simd:sum a :end 257 :stride 2)))
+                     (simd:copy! b out :end 257 :source-stride 2 :destination-stride 2)
+                     (dotimes (i 257) (is (= 3f0 (aref b (* i 2)))))
+                     (fill b 2f0))))
+            (loop for name in names for function in functions do (setf (symbol-function name) function))))))))

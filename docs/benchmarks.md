@@ -145,26 +145,10 @@ element type. Native call setup is the fixed cost.
 
 ## Strided access
 
-Microseconds per call on SBCL 2.6.8, Apple M1, `single-float`, measured
-2026-10-01. Strided calls gather into temporaries, run the contiguous kernel
-and scatter outputs.
-
-| Backend | Elements | Stride | `sum` | `dot` | `add!` |
-|---|---:|---:|---:|---:|---:|
-| native | 1,024 | 1 | 0.36 | 0.40 | 0.38 |
-| native | 1,024 | 2 | 1.14 | 1.89 | 2.63 |
-| native | 1,024 | -1 | 1.15 | 1.89 | 2.64 |
-| native | 65,536 | 1 | 16.05 | 16.10 | 8.75 |
-| native | 65,536 | 2 | 63.16 | 237.01 | 194.37 |
-| lisp | 1,024 | 1 | 1.11 | 1.71 | 21.29 |
-| lisp | 1,024 | 2 | 1.88 | 3.30 | 23.40 |
-| lisp | 65,536 | 1 | 61.75 | 93.84 | 1258.39 |
-| lisp | 65,536 | 2 | 107.15 | 185.16 | 1403.02 |
-
-Strided calls cost 1.1x to 22x their contiguous equivalents; the native
-backend pays most because the contiguous kernels are fastest. Contiguous short
-calls pay about 0.02 to 0.05 us for stride handling: `sum` of 8 elements takes
-0.08 us and `add!` 0.18 us on the native backend.
+Native non-unit strides traverse storage directly. The
+[strided performance page](strided-performance.md) compares complete calls with
+the gathered baseline for signed strides, pointer and copy access, arithmetic,
+reductions, masks, conversions and BLAS Level 1 operations.
 
 ## Spill scratch evaluation
 
@@ -186,8 +170,8 @@ compiler, CPU, memory access mode, and system load.
 
 - These results cover one Apple M1 using SBCL, CCL, and ECL. They do not
   measure x86-64 SBCL SIMD or other CPUs.
-- Strided calls gather into temporaries;
-  see [#49](https://github.com/communal-software/trivial-simd/issues/49).
+- Non-native strided calls retain staging; see
+  [strided execution limitations](strided-performance.md#limitations).
 - Short kernel setup and copy-mode costs remain; see
   [kernel limitations](kernels.md#limitations) and
   [array access limitations](backends.md#limitations).

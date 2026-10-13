@@ -136,7 +136,8 @@ vector (`:input-start` and `:input-stride`, `:left-start` and `:left-stride`).
 - `argmin` and `argmax` return the index into the vector, not the position
   along the stride. `define-kernel` functions take no per-element strides; float numeric kernels
   support [row strides](kernel-rows.md).
-- Strided calls run the contiguous kernels on gathered copies.[^gather]
+- Non-unit strides on `:native` traverse the original storage directly, including
+  copied array-access mode. Other backends retain their staging paths.[^strided]
 
 The [kernel API](kernels.md#reduction-kernels) composes arithmetic inside a scalar
 reduction without a full-length intermediate vector.
@@ -155,16 +156,17 @@ The API does not expose SIMD packs; [kernels](kernels.md) compose operations
 instead. The available integer operations and backend paths are described in
 [Integer vectors](integers.md).
 
-| Area | Ticket |
+| Area | Reference |
 |---|---|
-| Native strided kernels | [#49](https://github.com/communal-software/trivial-simd/issues/49) |
+| Non-native strided calls use staging | See [strided execution](strided-performance.md#limitations) |
 
 [^overlap]: Shifted overlapping inputs use full-slice temporary vectors before
     backend dispatch or block staging. Simple Lisp vectors share storage by
     identity; foreign views share storage by byte address, including views with
     different element sizes. Disjoint strided slices do not require snapshots.
-[^gather]: Each strided vector costs one temporary and one extra pass per call.
-    At 1,024 elements a strided call takes 3x to 7x a contiguous native call.
-    See [benchmarks](benchmarks.md#strided-access).
+[^strided]: Native pointer calls use NEON/SSE2 packs with bounded stack workspace.
+    Copy mode uses typed Lisp loops for arrays, and direct traversal for mixed
+    array/view calls. Required overlap snapshots remain. See
+    [strided performance](strided-performance.md).
 [^order]: SIMD reductions accumulate lanes separately before combining them.
     Compare results with a tolerance when the operation order matters.

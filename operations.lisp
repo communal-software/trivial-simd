@@ -116,6 +116,9 @@ stride, or NIL to use START or STRIDE (default 1)."
       (resolve-bulk-operands destination (list left right)
                              (list left-start right-start) start end destination-start
                              (list left-stride right-stride) stride destination-stride)
+    (when (and strides (direct-strided-p strides))
+      (return-from binary-operation
+        (strided-bulk operation destination (list left right) count offsets strides)))
     (destructuring-bind (destination-offset left-offset right-offset) offsets
       (destructuring-bind (&optional destination-stride left-stride right-stride) strides
         (with-bulk-staged ((destination destination-offset destination-stride :out)
@@ -189,6 +192,9 @@ the ...-START and ...-STRIDE keywords override one vector." verb)
         (return-from scale! x))))
   (multiple-value-bind (type count offsets strides)
       (resolve-bulk-operands x (list a) (list nil) start end nil nil stride)
+    (when (and strides (direct-strided-p strides))
+      (return-from scale!
+        (strided-bulk :scale x (list a) count offsets strides)))
     (let ((offset (first offsets)))
       (with-staged ((x offset (first strides) :in-out))
           (count :direct (and (eq *backend* :native) (not (complex-type-p type))))
@@ -218,6 +224,9 @@ the ...-START and ...-STRIDE keywords override one vector." verb)
   (multiple-value-bind (type count offsets strides)
       (resolve-bulk-operands y (list a x) (list nil x-start) start end y-start
                              (list nil x-stride) stride y-stride)
+    (when (and strides (direct-strided-p strides))
+      (return-from axpy!
+        (strided-bulk :axpy y (list a x) count offsets strides)))
     (destructuring-bind (y-offset scalar-offset x-offset) offsets
       (declare (ignore scalar-offset))
       (with-bulk-staged ((y y-offset (first strides) :in-out)
@@ -238,6 +247,9 @@ the ...-START and ...-STRIDE keywords override one vector." verb)
                              start end destination-start
                              (list x-stride y-stride z-stride) stride destination-stride)
     (declare (ignore type))
+    (when (and strides (direct-strided-p strides))
+      (return-from fma!
+        (strided-bulk :fma destination (list x y z) count offsets strides)))
     (destructuring-bind (d-offset x-offset y-offset z-offset) offsets
       (destructuring-bind (&optional d-stride x-stride y-stride z-stride) strides
         (with-bulk-staged ((destination d-offset d-stride :out)
@@ -278,6 +290,8 @@ return double precision."
       (resolve-slice (list input) (list input-start) start end (list input-stride) stride)
     (let ((offset (first offsets))
           (wide (wide-accumulation-p type accumulate)))
+      (when (and strides (direct-strided-p strides))
+        (return-from sum (strided-reduce :sum (list input) count offsets strides wide)))
       (with-staged ((input offset (first strides)))
           (count :direct (and (eq *backend* :native) (not (complex-type-p type)))
                  :combine (sum-combiner type))
@@ -310,6 +324,8 @@ and return double precision."
                      (list left-stride right-stride) stride)
     (destructuring-bind (left-offset right-offset) offsets
       (let ((wide (wide-accumulation-p type accumulate)))
+        (when (and strides (direct-strided-p strides))
+          (return-from dot (strided-reduce :dot (list left right) count offsets strides wide)))
         (with-staged ((left left-offset (first strides))
                       (right right-offset (second strides)))
             (count :direct (and (eq *backend* :native) (not (complex-type-p type)))
@@ -329,6 +345,8 @@ and return double precision."
                      (list left-stride right-stride) stride)
     (unless (complex-type-p type)
       (error "DOTC requires complex vectors"))
+    (when (and strides (direct-strided-p strides))
+      (return-from dotc (strided-reduce :dotc (list left right) count offsets strides (wide-accumulation-p type accumulate))))
     (destructuring-bind (left-offset right-offset) offsets
       (with-staged ((left left-offset (first strides))
                     (right right-offset (second strides)))
