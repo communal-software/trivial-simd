@@ -93,7 +93,9 @@ BLAS Level 1 tests cover real and complex precisions, offsets, increments,
 errors, rotations, and convenience wrappers. Generic Level 1 tests cover f32,
 f16 and bf16 vectors and views, single-float results, nearest-even encoded
 stores, bit-preserving copy/swap, overlap, zero factors, scaled f32 norms,
-empty calls, validation before writes and conversion fallback. Run
+empty calls, validation before writes and conversion fallback. ECL tests verify
+that trap-masking helpers restore their incoming settings across nested calls
+and errors. Run
 `examples/blas-encoded.lisp` for encoded arithmetic. Tests compare against an available
 system CBLAS (Accelerate on macOS, or OpenBLAS/BLAS on other platforms); only
 the reference comparison is skipped when no CBLAS is installed.
