@@ -22,6 +22,10 @@ Run [the example](../examples/encoded-matmul.lisp) for ordinary arrays and forei
 
 ## Execution
 
+`(encoded-matmul-native-p)` returns true when the active backend uses the native
+encoded kernel. It returns false for the Lisp backend or a missing library or
+symbol, without running a product.
+
 | Configuration | Path |
 |---|---|
 | Native library with the matmul symbol, backend `:native` or `:sbcl` | NEON on ARM64, SSE2 on x86-64, scalar C elsewhere |

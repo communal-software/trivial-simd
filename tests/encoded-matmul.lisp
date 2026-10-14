@@ -1,6 +1,14 @@
 (in-package #:trivial-simd/tests)
 (in-suite :trivial-simd)
 
+(test encoded-matmul-native-capability
+  (dolist (backend (available-backends))
+    (with-backend (backend)
+      (is (eq (and simd::*native-encoded-matmul-p* (not (eq backend :lisp)) t)
+              (simd:encoded-matmul-native-p)))))
+  (let ((simd::*native-encoded-matmul-p* nil))
+    (is (null (simd:encoded-matmul-native-p)))))
+
 (test encoded-matmul-layouts-and-backends
   (dolist (encoding '(:f16 :bf16))
     (dolist (shape '((1 1 1) (3 5 7) (4 3 16) (5 9 33) (6 7 65) (46 3 128)))

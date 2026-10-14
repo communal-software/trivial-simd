@@ -15,4 +15,5 @@
            #:nd-exp! #:nd-sin! #:nd-cos! #:nd-silu! #:nd-gelu!
            #:vector-view #:make-vector-view #:vector-view-p #:vector-view-pointer
            #:vector-view-type #:vector-view-length
-           #:q8-0-matmul! #:q4-0-matmul! #:q4-k-matmul! #:q6-k-matmul! #:f16-matmul! #:bf16-matmul!))
+           #:q8-0-matmul! #:q4-0-matmul! #:q4-k-matmul! #:q6-k-matmul!
+           #:f16-matmul! #:bf16-matmul! #:encoded-matmul-native-p))

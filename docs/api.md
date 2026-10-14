@@ -30,6 +30,7 @@ is.
 | [`minimum`, `maximum`, `argmin`, `argmax`](reductions.md) | Extreme element or its index |
 | [`make-vector-view`](vector-views.md) | A vector of foreign memory |
 | `(backend)` | `:sbcl`, `:native`, or `:lisp` |
+| `(encoded-matmul-native-p)` | Boolean: encoded matmul uses native execution under the active backend |
 | [N-D operations](nd.md) | Arithmetic, real-float math/activations, masks and conversion over independently strided shapes |
 | [Small arrays](small-arrays.md) | Short float vectors run inline, without a backend call |
 

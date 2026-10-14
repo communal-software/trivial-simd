@@ -8,6 +8,10 @@
 (defvar *native-encoded-matmul-p*
   (and *native-available-p* (null (missing-native-symbols '("ts_encoded_matmul")))))
 
+(defun encoded-matmul-native-p ()
+  "True when encoded matmul uses native execution under the active backend."
+  (and *native-encoded-matmul-p* (not (eq *backend* :lisp)) t))
+
 (defun encoded-matrix-span (storage type start rows columns stride)
   (unless (eq (vector-type storage) type) (error "Matmul storage requires ~S" type))
   (nd-integer start 0)
@@ -56,7 +60,7 @@
              (when (or (encoded-matmul-overlap-p out os out-end x xs x-end)
                        (encoded-matmul-overlap-p out os out-end weights ws weights-end))
                (error "Matmul output overlaps an input"))
-             (if (and *native-encoded-matmul-p* (not (eq *backend* :lisp)))
+             (if (encoded-matmul-native-p)
                  (with-pinned-pointers ((wp weights) (xp x) (op out))
                    (check-native-extended-status
                     (%native-encoded-matmul
