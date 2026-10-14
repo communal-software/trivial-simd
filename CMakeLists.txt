@@ -31,7 +31,7 @@ function(configure_native_library target)
   endforeach()
 endfunction()
 
-add_library(trivial_simd SHARED native/trivial_simd.c native/extended.c native/complex.c native/blas.c native/q8.c native/encoded-matmul.c)
+add_library(trivial_simd SHARED native/trivial_simd.c native/extended.c native/complex.c native/blas.c native/q8.c native/encoded-matmul.c native/packed-matmul.c)
 configure_native_library(trivial_simd)
 target_compile_definitions(trivial_simd PRIVATE TS_ND_ENABLED)
 configure_fma(trivial_simd)

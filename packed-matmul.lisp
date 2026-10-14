@@ -1,0 +1,95 @@
+(in-package #:trivial-simd)
+
+(define-native ("ts_packed_matmul" %native-packed-matmul) :int
+  (type :int) (n :int64) (m :int64) (k :int64) (blocks :pointer)
+  (x :pointer) (x-stride :int64) (out :pointer) (out-stride :int64))
+
+(defvar *native-packed-matmul-p*
+  (and *native-available-p* (ignore-errors (cffi:foreign-symbol-pointer "ts_packed_matmul")) t))
+
+(defun packed-geometry (type)
+  (ecase type (2 (values 32 18)) (12 (values 256 144)) (14 (values 256 210))))
+
+(defun packed-half (bytes base)
+  (coerce (q8-0-scale (vector-ref bytes base) (vector-ref bytes (1+ base))) 'single-float))
+
+(defun packed-value (type bytes base e)
+  (ecase type
+    (2 (* (packed-half bytes base)
+          (- (ldb (byte 4 (if (< e 16) 0 4)) (vector-ref bytes (+ base 2 (mod e 16)))) 8)))
+    (12
+     (let* ((group (floor e 32)) (s (+ base 4))
+            (scale (if (< group 4) (logand 63 (vector-ref bytes (+ s group)))
+                       (logior (logand 15 (vector-ref bytes (+ s group 4)))
+                               (ash (logand 192 (vector-ref bytes (+ s group -4))) -2))))
+            (minimum (if (< group 4) (logand 63 (vector-ref bytes (+ s group 4)))
+                         (logior (ash (vector-ref bytes (+ s group 4)) -4)
+                                 (ash (logand 192 (vector-ref bytes (+ s group))) -2))))
+            (q (ldb (byte 4 (* 4 (mod group 2)))
+                    (vector-ref bytes (+ base 16 (* 32 (floor group 2)) (mod e 32))))))
+       (- (* (* (packed-half bytes base) scale) q)
+          (* (packed-half bytes (+ base 2)) minimum))))
+    (14
+     (let* ((half (floor e 128)) (group (floor (mod e 128) 32)) (l (mod e 32))
+            (low (ldb (byte 4 (* 4 (floor group 2)))
+                      (vector-ref bytes (+ base (* half 64) (* (mod group 2) 32) l))))
+            (high (ldb (byte 2 (* group 2)) (vector-ref bytes (+ base 128 (* half 32) l))))
+            (scale (vector-ref bytes (+ base 192 (* half 8) (* group 2) (floor l 16)))))
+       (* (* (packed-half bytes (+ base 208)) (if (< scale 128) scale (- scale 256)))
+          (- (logior low (ash high 4)) 32))))))
+
+(defun packed-matmul-lisp (type out x blocks n m k xs os)
+  (multiple-value-bind (elements bytes) (packed-geometry type)
+    (let ((scratch (make-array elements :element-type 'single-float)))
+      (dotimes (j m)
+        (loop for i from 0 below n by 4 for tile = (min 4 (- n i)) do
+          (let ((sums (make-array tile :element-type 'double-float :initial-element 0d0)))
+            (dotimes (b (floor k elements))
+              (dotimes (e elements)
+                (setf (aref scratch e) (packed-value type blocks (* (+ (* j (floor k elements)) b) bytes) e)))
+              (dotimes (row tile)
+                (dotimes (e elements)
+                  (incf (aref sums row)
+                        (* (coerce (vector-ref x (+ (* (+ i row) xs) (* b elements) e)) 'double-float)
+                           (aref scratch e))))))
+            (dotimes (row tile)
+              (setf (vector-ref out (+ (* (+ i row) os) j)) (coerce (aref sums row) 'single-float)))))))))
+
+(defun packed-matmul! (type out x blocks n m k xs os)
+  (dolist (dimension (list n m k)) (nd-integer dimension 0))
+  (multiple-value-bind (elements bytes) (packed-geometry type)
+    (unless (zerop (mod k elements)) (error "Packed rows need multiples of ~D elements" elements))
+    (let ((xe (encoded-matrix-span x :f32 0 n k xs))
+          (oe (encoded-matrix-span out :f32 0 n m os))
+          (be (nd-integer (* m (floor k elements) bytes) 0)))
+      (unless (and (eq (vector-type blocks) :u8) (<= be (vector-length blocks)))
+        (error "Packed weight bytes are missing or have the wrong type"))
+      (when (or (zerop n) (zerop m)) (return-from packed-matmul! out))
+      (flet ((execute ()
+               (when (or (encoded-matmul-overlap-p out 0 oe x 0 xe)
+                         (encoded-matmul-overlap-p out 0 oe blocks 0 be))
+                 (error "Matmul output overlaps an input"))
+               (if (and *native-packed-matmul-p* (not (eq *backend* :lisp)))
+                   (with-pinned-pointers ((bp blocks) (xp x) (op out))
+                     (case (%native-packed-matmul type n m k bp xp xs op os)
+                       (0 out) (2 (error "Packed scale is not finite"))
+                       (t (error "Invalid packed matmul arguments"))))
+                   (progn
+                     (loop for base from 0 below be by bytes do
+                       (packed-half blocks (+ base (if (= type 14) 208 0)))
+                       (when (= type 12) (packed-half blocks (+ base 2))))
+                     (packed-matmul-lisp type out x blocks n m k xs os)))))
+        #+(or sbcl ccl ecl)
+        (nd-call-with-storage-addresses (remove-duplicates (list out x blocks) :test #'eq) #'execute)
+        #-(or sbcl ccl ecl)
+        (execute))))
+  out)
+
+(defmacro define-packed-matmul (name type)
+  `(defun ,name (out x blocks n m k &key (x-stride k) (out-stride m))
+     "Write OUT = X × WEIGHTSᵀ from packed GGUF weights and f32 activations."
+     (packed-matmul! ,type out x blocks n m k x-stride out-stride)))
+
+(define-packed-matmul q4-0-matmul! 2)
+(define-packed-matmul q4-k-matmul! 12)
+(define-packed-matmul q6-k-matmul! 14)

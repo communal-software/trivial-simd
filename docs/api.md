@@ -22,6 +22,7 @@ is.
 | [`copy!`, `fill!`, `swap!`](copy.md) | Copy, set or exchange slices of any numeric vector |
 | [Unary and bounded operations](elementwise.md) | Negate, absolute value, square root, reciprocal, min, max, clamp |
 | [`q8-0-matmul!`](q8-matmul.md) | Matrix product of f32 rows with Q8_0 weight blocks |
+| [`q4-0-matmul!`, `q4-k-matmul!`, `q6-k-matmul!`](packed-matmul.md) | Matrix products of f32 rows with packed Q4/Q6 weights |
 | [`f16-matmul!`, `bf16-matmul!`](encoded-matmul.md) | Matrix product of f32 rows with encoded weight rows |
 | [`convert!`](conversion.md) | Convert among numeric vector types and bf16/f16 storage |
 | [Masks and selection](masks.md) | Compare, select, count, any, all |

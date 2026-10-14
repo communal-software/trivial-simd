@@ -1,0 +1,72 @@
+(in-package #:trivial-simd/tests)
+
+(in-suite :trivial-simd)
+
+(defun packed-kernel (dtype)
+  (ecase dtype (:q4_0 #'simd:q4-0-matmul!) (:q4_k #'simd:q4-k-matmul!) (:q6_k #'simd:q6-k-matmul!)))
+
+(defun packed-test-close (actual expected magnitude)
+  (<= (abs (- actual expected)) (+ 1d-5 (* 1d-5 magnitude))))
+
+(test packed-matmul-independent-reference
+  (dolist (fixture *packed-golden-blocks*)
+    (destructuring-bind (dtype bytes weights) fixture
+      (dolist (m '(1 5))
+        (let ((k (floor (length weights) m)))
+          (dolist (n '(1 3 4 5 9))
+            (let* ((xs (+ k 3)) (os (+ m 2))
+                   (x (make-array (* n xs) :element-type 'single-float :initial-element 0f0)))
+              (dotimes (i (length x)) (setf (aref x i) (* 0.1f0 (- (mod (* i 7) 19) 9))))
+              (dolist (backend '(:lisp :auto))
+                (let ((simd::*backend* backend)
+                      (out (make-array (* n os) :element-type 'single-float :initial-element -99f0)))
+                  (funcall (packed-kernel dtype) out x bytes n m k :x-stride xs :out-stride os)
+                  (dotimes (i n)
+                    (dotimes (j m)
+                      (let ((sum 0d0) (magnitude 0d0))
+                        (dotimes (e k)
+                          (let ((product (* (coerce (aref x (+ (* i xs) e)) 'double-float)
+                                            (aref weights (+ (* j k) e)))))
+                            (incf sum product) (incf magnitude (abs product))))
+                        (is (packed-test-close (aref out (+ (* i os) j)) sum magnitude)
+                            "~S ~S n=~D m=~D" dtype backend n m)))
+                    (loop for j from m below os do (is (= -99f0 (aref out (+ (* i os) j))))))))))))))
+)
+
+(test packed-matmul-foreign-and-missing-native
+  (dolist (fixture *packed-golden-blocks*)
+    (destructuring-bind (dtype bytes weights) fixture
+      (let* ((k (length weights)) (x (make-array k :element-type 'single-float :initial-element 1f0))
+             (expected (reduce #'+ weights :initial-value 0d0)))
+        (cffi:with-foreign-objects ((bp :uint8 (1+ (length bytes))) (xp :float (1+ k)) (op :float 2))
+          (let ((b (simd:make-vector-view bp :u8 (length bytes) :offset 1))
+                (input (simd:make-vector-view xp :f32 k :offset 1))
+                (out (simd:make-vector-view op :f32 1 :offset 1)))
+            (simd:copy! b bytes) (simd:copy! input x)
+            (dolist (native '(nil t))
+              (let ((simd::*native-packed-matmul-p* (and native simd::*native-packed-matmul-p*)))
+                (funcall (packed-kernel dtype) out input b 1 1 k)
+                (is (packed-test-close (cffi:mem-aref op :float 1) expected
+                                      (reduce #'+ weights :key #'abs :initial-value 0d0)))))))))))
+
+(test packed-matmul-validation-before-writing
+  (dolist (fixture *packed-golden-blocks*)
+    (destructuring-bind (dtype bytes weights) fixture
+      (let* ((k (floor (length weights) 5)) (kernel (packed-kernel dtype))
+             (x (make-array k :element-type 'single-float :initial-element 1f0))
+             (out (make-array 5 :element-type 'single-float :initial-element -99f0)))
+        (signals error (funcall kernel out x bytes 1 5 (1- k)))
+        (signals error (funcall kernel out x (subseq bytes 0 (1- (length bytes))) 1 5 k))
+        (signals error (funcall kernel out x bytes 2 5 k))
+        (signals error (funcall kernel out x bytes 1 5 k :x-stride (1- k)))
+        (signals error (funcall kernel out x bytes 1 5 k :out-stride 4))
+        (signals error (funcall kernel x x bytes 1 5 k))
+        (dolist (backend '(:lisp :auto))
+          (let ((simd::*backend* backend) (bad (copy-seq bytes))
+                (offset (ecase dtype (:q4_0 1) (:q4_k 3) (:q6_k 209))))
+            (setf (aref bad offset) 124)
+            (signals error (funcall kernel out x bad 1 5 k))))
+        (is (every (lambda (v) (= v -99f0)) out))
+        (is (eq out (funcall kernel out x bytes 0 5 k)))
+        (funcall kernel out x (make-array 0 :element-type '(unsigned-byte 8)) 1 5 0)
+        (is (every #'zerop out))))))

@@ -1,0 +1,21 @@
+(require :asdf)
+(asdf:load-system "trivial-simd")
+(dolist (spec '((trivial-simd:q4-0-matmul! 32 18 0) (trivial-simd:q4-k-matmul! 256 144 0)
+                (trivial-simd:q6-k-matmul! 256 210 208)))
+  (destructuring-bind (kernel elements bytes offset) spec
+    (let* ((m 512) (k 2048) (blocks (make-array (* m (/ k elements) bytes) :element-type '(unsigned-byte 8) :initial-element 17)))
+      (loop for b from 0 below (length blocks) by bytes do
+        (setf (aref blocks (+ b offset)) 0 (aref blocks (+ b offset 1)) 40)
+        (when (= bytes 144) (setf (aref blocks (+ b 2)) 0 (aref blocks (+ b 3)) 40)))
+      (cffi:with-foreign-object (pointer :uint8 (length blocks))
+        (let ((view (trivial-simd:make-vector-view pointer :u8 (length blocks))))
+          (trivial-simd:copy! view blocks)
+          (dolist (n '(1 16 64))
+            (let ((x (make-array (* n k) :element-type 'single-float :initial-element 0.1f0))
+                  (out (make-array (* n m) :element-type 'single-float)))
+              (funcall kernel out x view n m k)
+              (let ((start (get-internal-real-time)) (allocated (sb-ext:get-bytes-consed)))
+                (dotimes (iteration 5) (funcall kernel out x view n m k))
+                (format t "~A n=~D ~,3F ms ~D bytes/call~%" kernel n
+                        (* 200.0 (/ (- (get-internal-real-time) start) internal-time-units-per-second))
+                        (round (- (sb-ext:get-bytes-consed) allocated) 5))))))))))
