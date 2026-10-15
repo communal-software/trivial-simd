@@ -78,7 +78,7 @@ TS_LAZY_INTEGER_APPLY(u64, uint64_t)
 
 #define TS_LAZY_KERNEL(suffix, type, apply) \
 static int ts_lazy_kernel_##suffix(const uint8_t *code, size_t length, const type *constants, \
-        const type *const *inputs, type *out, size_t n, size_t slots, type *scratch) { \
+        const type *const *inputs, type *out, size_t n, size_t slots, type *scratch, size_t input_offset) { \
     if (!length || length % 4 || (slots && !scratch)) return -4; \
     type registers[TS_KERNEL_REGISTERS][TS_KERNEL_BLOCK]; \
     type safe_left[TS_KERNEL_BLOCK], safe_right[TS_KERNEL_BLOCK], result[TS_KERNEL_BLOCK]; \
@@ -94,7 +94,7 @@ static int ts_lazy_kernel_##suffix(const uint8_t *code, size_t length, const typ
                 if (slot >= slots || slots - slot < 2) return -4; \
                 type *parent = scratch + slot * TS_KERNEL_BLOCK, *otherwise = parent + TS_KERNEL_BLOCK; \
                 if (op == TS_OP_BRANCH) { \
-                    const type *mask = dst < TS_KERNEL_REGISTERS ? registers[dst] : inputs[dst - TS_KERNEL_REGISTERS] + base; \
+                    const type *mask = dst < TS_KERNEL_REGISTERS ? registers[dst] : inputs[dst - TS_KERNEL_REGISTERS] + input_offset + base; \
                     for (size_t j = 0; j < m; ++j) { \
                         parent[j] = active[j]; \
                         otherwise[j] = active[j] && mask[j] == 0; \
@@ -112,7 +112,7 @@ static int ts_lazy_kernel_##suffix(const uint8_t *code, size_t length, const typ
                 if (slot >= slots) return -4; \
                 type *saved = scratch + slot * TS_KERNEL_BLOCK; \
                 type *value = dst == TS_KERNEL_OUTPUT ? out + base : dst < TS_KERNEL_REGISTERS ? \
-                    registers[dst] : (type *)(inputs[dst - TS_KERNEL_REGISTERS] + base); \
+                    registers[dst] : (type *)(inputs[dst - TS_KERNEL_REGISTERS] + input_offset + base); \
                 if (active_count == m) { \
                     if (op == TS_OP_SPILL) memcpy(saved, value, m * sizeof(type)); \
                     else memcpy(value, saved, m * sizeof(type)); \
@@ -127,10 +127,10 @@ static int ts_lazy_kernel_##suffix(const uint8_t *code, size_t length, const typ
                 for (size_t j = 0; j < m; ++j) if (active[j]) memcpy(destination + j, constants + a, sizeof(type)); \
                 continue; \
             } \
-            const type *left = a < TS_KERNEL_REGISTERS ? registers[a] : inputs[a - TS_KERNEL_REGISTERS] + base; \
+            const type *left = a < TS_KERNEL_REGISTERS ? registers[a] : inputs[a - TS_KERNEL_REGISTERS] + input_offset + base; \
             int binary = (op >= TS_OP_ADD && op <= TS_OP_DIVIDE) || op == TS_OP_MIN || op == TS_OP_MAX || \
                 op == TS_OP_FMA || (op >= TS_OP_EQ && op <= TS_OP_SELECT); \
-            const type *right = binary ? (b < TS_KERNEL_REGISTERS ? registers[b] : inputs[b - TS_KERNEL_REGISTERS] + base) : NULL; \
+            const type *right = binary ? (b < TS_KERNEL_REGISTERS ? registers[b] : inputs[b - TS_KERNEL_REGISTERS] + input_offset + base) : NULL; \
             if (active_count == m) { \
                 int status = apply(op, destination, left, right, m); \
                 if (status) return status; \
@@ -159,3 +159,53 @@ TS_LAZY_KERNEL(u32, uint32_t, ts_lazy_apply_u32)
 TS_LAZY_KERNEL(s64, uint64_t, ts_lazy_apply_s64)
 TS_LAZY_KERNEL(u64, uint64_t, ts_lazy_apply_u64)
 #undef TS_LAZY_KERNEL
+
+#if defined(__clang__)
+#define TS_LAZY_FENV _Pragma("STDC FENV_ACCESS ON")
+#else
+#define TS_LAZY_FENV
+#endif
+
+#define TS_LAZY_EVALUATE(suffix, type, integral, reduce) \
+static int ts_lazy_evaluate_##suffix(const uint8_t *code, size_t length, const type *constants, \
+        const type *const *inputs, type *out, size_t n, size_t slots, type *scratch, int sum) { \
+    TS_LAZY_FENV \
+    if (!n) { if (sum) *out = 0; return 0; } \
+    if (slots > SIZE_MAX / TS_KERNEL_BLOCK / sizeof(type)) return -1; \
+    int status = ts_lazy_validate(code, length, slots, TS_KERNEL_OUTPUT - TS_KERNEL_REGISTERS, scratch, sizeof(type)); \
+    if (status) return status; \
+    fenv_t environment; \
+    if (!integral && feholdexcept(&environment)) return -5; \
+    if (!sum) status = ts_lazy_kernel_##suffix(code, length, constants, inputs, out, n, slots, scratch, 0); \
+    else { \
+        type total = 0; \
+        for (size_t base = 0; base < n; base += TS_KERNEL_BLOCK) { \
+            size_t m = n - base < TS_KERNEL_BLOCK ? n - base : TS_KERNEL_BLOCK; \
+            type values[TS_KERNEL_BLOCK], block; \
+            status = ts_lazy_kernel_##suffix(code, length, constants, inputs, values, m, slots, scratch, base); \
+            if (status) break; \
+            reduce; \
+            total = integral ? (type)((uint64_t)total + (uint64_t)block) : total + block; \
+        } \
+        if (!status) *out = total; \
+    } \
+    if (!integral) { \
+        int exceptions = fetestexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW); \
+        if (fesetenv(&environment) || exceptions) status = -5; \
+    } \
+    return status; \
+}
+
+TS_LAZY_EVALUATE(f32, float, 0, block = ts_sum_f32(values, m))
+TS_LAZY_EVALUATE(f64, double, 0, block = ts_sum_f64(values, m))
+TS_LAZY_EVALUATE(s8, uint8_t, 1, ts_sum_s8(values, &block, m))
+TS_LAZY_EVALUATE(u8, uint8_t, 1, ts_sum_u8(values, &block, m))
+TS_LAZY_EVALUATE(s16, uint16_t, 1, ts_sum_s16(values, &block, m))
+TS_LAZY_EVALUATE(u16, uint16_t, 1, ts_sum_u16(values, &block, m))
+TS_LAZY_EVALUATE(s32, uint32_t, 1, ts_sum_s32(values, &block, m))
+TS_LAZY_EVALUATE(u32, uint32_t, 1, ts_sum_u32(values, &block, m))
+TS_LAZY_EVALUATE(s64, uint64_t, 1, ts_sum_s64(values, &block, m))
+TS_LAZY_EVALUATE(u64, uint64_t, 1, ts_sum_u64(values, &block, m))
+
+#undef TS_LAZY_EVALUATE
+#undef TS_LAZY_FENV

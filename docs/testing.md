@@ -593,6 +593,18 @@ benchmark or test jobs. See [method and results](mask-reducer-performance.md).
 
 ## Conversion and mask profiling
 
+Lazy selection tests cover guarded square roots, division and logarithms,
+mixed and nested masks, slices, SIMD tails, block boundaries, views, aliases,
+row layouts, declared inputs, nested reduction passes and register spilling.
+Native C tests exercise allocating, scratch-backed, sum, row and descriptor
+entry points in scalar and SIMD builds, including allocation failures and
+cleanup after selected errors. SBCL checks aliased scalar replay after underflow.
+
+`sbcl --dynamic-space-size 4096 --script tests/selection-bench.lisp` compares
+complete native lazy calls, an eager control with safe operands, and Lisp
+selection. Result checks precede warmed calibrated timings. Run it on an idle
+machine; see [selection measurements](kernel-performance.md#lazy-selection).
+
 Native mask sharing tests cover shared-value lifetimes, distinct spilling trees,
 wrapping arithmetic, selected float bits, lazy branch regions, error handling,
 views, exact aliases, and concurrent calls. See the

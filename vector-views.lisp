@@ -193,10 +193,10 @@ or NIL. Lisp vectors share storage by identity; views share it by address."
           (setf form `(,@wrapper ,form)))
         `(let ((,d-stride ,output-stride)) ,form)))))
 
-(defun unshifted-kernel-input (destination d-offset input offset count)
+(defun unshifted-kernel-input (destination d-offset input offset count &optional snapshot-exact-p)
   "Return INPUT and OFFSET, or a Lisp copy of INPUT's COUNT-element slice and 0
-when that slice shares memory with DESTINATION's slice other than element for
-element, so a kernel reads every input element before writing any output."
+when that slice overlaps DESTINATION. Exact aliases are retained unless
+SNAPSHOT-EXACT-P protects inputs for scalar replay."
   (declare (type fixnum d-offset offset count))
   (let ((input-size (vector-element-size (vector-type input)))
         (output-size (vector-element-size (vector-type destination))))
@@ -205,7 +205,7 @@ element, so a kernel reads every input element before writing any output."
               ((and (vector-view-p input) (vector-view-p destination))
                (values (view-address input offset) (view-address destination d-offset)))
               (t (return-from unshifted-kernel-input (values input offset))))
-      (if (and (or (/= input-low output-low) (/= input-size output-size))
+      (if (and (or snapshot-exact-p (/= input-low output-low) (/= input-size output-size))
                (< input-low (+ output-low (* count output-size)))
                (< output-low (+ input-low (* count input-size))))
           (let ((copy (staging-buffer input count)))

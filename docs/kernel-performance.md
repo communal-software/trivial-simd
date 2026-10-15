@@ -16,6 +16,27 @@ conversion and repeated-scale preparation costs.
 See [spill profiling](kernel-spilling.md) for register-heavy kernels and scratch
 storage measurements.
 
+## Lazy selection
+
+Native lazy selection evaluates only active branch lanes. For this mixed-mask
+fixture, complete native calls take about 0.62–0.67 µs at 32 elements and
+507–542 µs at 65,536 elements. Eager blending costs less; the Lisp lazy path
+costs more in these measurements.[^selection-profile]
+
+| Type | Elements | Native eager control (µs) | Native lazy (µs) | Lisp lazy (µs) |
+|---|---:|---:|---:|---:|
+| f32 | 32 | 0.253 | 0.618 | 0.724 |
+| f32 | 1,024 | 1.548 | 8.285 | 19.219 |
+| f32 | 65,536 | 86.151 | 507.273 | 1211.969 |
+| f64 | 32 | 0.263 | 0.673 | 0.718 |
+| f64 | 1,024 | 2.215 | 8.794 | 19.542 |
+| f64 | 65,536 | 131.945 | 542.320 | 1380.250 |
+
+Run `sbcl --dynamic-space-size 4096 --script tests/selection-bench.lisp`.
+The eager control evaluates both branches with safe operands. See
+[lazy selection semantics](kernels.md#selection) and the
+[raw measurements](benchmark-runs/2026-10-15-lazy-selection.txt).
+
 ## Row batching
 
 Batching amortizes setup across rows. Apple M1, SBCL 2.6.8, native pointer
@@ -215,3 +236,11 @@ medians of three calibrated batches. The first-call clock resolution is 1 µs.[^
 See [complete-stage measurements](kernel-stage-performance.md) for softmax,
 SiLU, and RoPE table preparation, including multi-pass setup, row batches,
 scalar system math, and native copy access.
+
+[^selection-profile]: Apple M1, macOS ARM64, SBCL 2.6.8, Release native library,
+    pointer access, 15 October 2026. Values are medians across three sequential
+    fresh processes; each process reports three calibrated warmed batches.
+    Disjoint inputs alternate `4` and `-1`; the expression is
+    `(select (> a 0) (sqrt (abs a)) 0)`. Timings include call setup and native
+    scratch allocation. Alias snapshots, other layouts and model workloads
+    are outside this measurement.

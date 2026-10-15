@@ -319,8 +319,8 @@ int ts_kernel_predication(void) {
 #define TS_KERNEL_OUTPUT 0xFF
 
 #define TS_LAZY_DECLARATION(suffix, type) \
-static int ts_lazy_kernel_##suffix(const uint8_t *, size_t, const type *, \
-    const type *const *, type *, size_t, size_t, type *);
+static int ts_lazy_evaluate_##suffix(const uint8_t *, size_t, const type *, \
+    const type *const *, type *, size_t, size_t, type *, int);
 TS_LAZY_DECLARATION(f32, float)
 TS_LAZY_DECLARATION(f64, double)
 TS_LAZY_DECLARATION(s8, uint8_t)
@@ -440,6 +440,8 @@ static int ts_kernel_apply_##mode##_##suffix(unsigned op, type *destination, \
 static int ts_kernel_run_##mode##_##suffix(const uint8_t *code, size_t code_length, \
                         const type *constants, const type *const *inputs, \
                         type *out, size_t n, size_t scratch_count, type *scratch) { \
+    if (code_length && code[0] == TS_OP_LAZY) \
+        return ts_lazy_evaluate_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch, sum); \
     TS_KERNEL_EXECUTE(type, 1, sum, \
         ts_kernel_reduce_##suffix(op, left, right, constant ? *constant : 0, m, block_result), \
         ts_kernel_apply_##mode##_##suffix(op, destination, left, right, m)); \
@@ -538,8 +540,6 @@ int ts_kernel_with_scratch_##suffix(const uint8_t *code, size_t code_length, \
                        const type *constants, const type *const *inputs, \
                        type *out, size_t n, size_t scratch_count, type *scratch, size_t capacity) { \
     if (n && scratch_count && (!scratch || capacity < scratch_count)) return -1; \
-    if (code_length && code[0] == TS_OP_LAZY) \
-        return ts_lazy_kernel_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch); \
     return ts_kernel_run_elementwise_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch); \
 } \
 int ts_kernel_sum_with_scratch_##suffix(const uint8_t *code, size_t code_length, \

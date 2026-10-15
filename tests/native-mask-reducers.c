@@ -131,8 +131,79 @@ static void check_nested_inactive_nan(void) {
     assert(value == 9);
 }
 
+
+#define CHECK_SELECTION_ENTRY_POINTS(suffix, type, integral) \
+static void check_selection_##suffix(void) { \
+    type flag[601], a[601], b[601], other[601], out[603], scratch[3 * TS_KERNEL_BLOCK + 2]; \
+    const type *inputs[] = {flag, a, b, other}; \
+    for (size_t i = 0; i < 601; ++i) { flag[i] = i % 2 == 0; a[i] = 4; b[i] = flag[i] ? 2 : 0; other[i] = 7; } \
+    const size_t lengths[] = {0, 1, 3, 255, 256, 257, 601}; \
+    for (size_t k = 0; k < sizeof lengths / sizeof *lengths; ++k) { \
+        size_t n = lengths[k]; \
+        out[0] = out[n + 1] = 99; \
+        scratch[0] = scratch[3 * TS_KERNEL_BLOCK + 1] = 99; \
+        assert(ts_kernel_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, out + 1, n, 3) == 0); \
+        for (size_t i = 0; i < n; ++i) assert(out[i + 1] == (i % 2 ? 7 : 2)); \
+        assert(out[0] == 99 && out[n + 1] == 99 && allocations == releases); \
+        assert(ts_kernel_with_scratch_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, \
+                                               out + 1, n, 3, scratch + 1, 3) == 0); \
+        for (size_t i = 0; i < n; ++i) assert(out[i + 1] == (i % 2 ? 7 : 2)); \
+        assert(scratch[0] == 99 && scratch[3 * TS_KERNEL_BLOCK + 1] == 99); \
+        type sum = 99; \
+        assert(ts_kernel_sum_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, &sum, n, 3) == 0); \
+        assert(sum == (type)(2 * ((n + 1) / 2) + 7 * (n / 2)) && allocations == releases); \
+    } \
+    b[0] = 0; \
+    assert(ts_kernel_with_scratch_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, \
+                                           out, 601, SIZE_MAX, scratch, SIZE_MAX) == -1); \
+    assert(ts_kernel_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, out, 601, 3) == (integral ? -3 : -5)); \
+    assert(allocations == releases); \
+    fail_allocation = 1; \
+    size_t before = allocations; \
+    out[0] = 99; \
+    assert(ts_kernel_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, out, 601, 3) == -1); \
+    assert(out[0] == 99 && allocations == before + 1 && releases == before); \
+    --allocations; fail_allocation = 0; \
+}
+CHECK_SELECTION_ENTRY_POINTS(f32, float, 0)
+CHECK_SELECTION_ENTRY_POINTS(f64, double, 0)
+CHECK_SELECTION_ENTRY_POINTS(s8, uint8_t, 1)
+CHECK_SELECTION_ENTRY_POINTS(u8, uint8_t, 1)
+CHECK_SELECTION_ENTRY_POINTS(s16, uint16_t, 1)
+CHECK_SELECTION_ENTRY_POINTS(u16, uint16_t, 1)
+CHECK_SELECTION_ENTRY_POINTS(s32, uint32_t, 1)
+CHECK_SELECTION_ENTRY_POINTS(u32, uint32_t, 1)
+CHECK_SELECTION_ENTRY_POINTS(s64, uint64_t, 1)
+CHECK_SELECTION_ENTRY_POINTS(u64, uint64_t, 1)
+
+#define CHECK_SELECTION_BATCHES(suffix, type, precision) \
+static void check_selection_batches_##suffix(void) { \
+    type flag[601], a[601], b[601], other[601], out[601], scratch[3 * TS_KERNEL_BLOCK]; \
+    const type *inputs[] = {flag, a, b, other}; \
+    ts_kernel_input descriptors[4]; \
+    const int64_t strides[] = {0, 0, 0, 0}; \
+    for (size_t i = 0; i < 601; ++i) { flag[i] = i % 2 == 0; a[i] = 4; b[i] = flag[i] ? 2 : 0; other[i] = 7; } \
+    for (size_t j = 0; j < 4; ++j) descriptors[j] = (ts_kernel_input){inputs[j], 601, 0, precision, 1, 0, 0}; \
+    type sum, rows[2]; \
+    assert(ts_kernel_sum_with_scratch_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, &sum, 601, 3, scratch, 3) == 0); \
+    assert(sum == 2702); \
+    assert(ts_kernel_sum_rows_##suffix(divide_selection, sizeof divide_selection, NULL, inputs, 4, strides, rows, 2, 601, 3) == 0); \
+    assert(rows[0] == 2702 && rows[1] == 2702); \
+    double wide; size_t index; \
+    assert(ts_kernel_inputs_##suffix(divide_selection, sizeof divide_selection, NULL, descriptors, 4, out, 1, 601, 3, TS_INPUT_OUTPUT, 0, &wide, &index) == 0); \
+    for (size_t i = 0; i < 601; ++i) assert(out[i] == (i % 2 ? 7 : 2)); \
+    assert(ts_kernel_inputs_##suffix(divide_selection, sizeof divide_selection, NULL, descriptors, 4, rows, 2, 601, 3, TS_INPUT_SUM, 0, &wide, &index) == 0); \
+    assert(rows[0] == 2702 && rows[1] == 2702 && allocations == releases); \
+}
+CHECK_SELECTION_BATCHES(f32, float, 0)
+CHECK_SELECTION_BATCHES(f64, double, 1)
+
 int main(void) {
     if (!ts_kernel_predication()) { puts("native predication unavailable; scalar fallback required"); return 0; }
+    check_selection_f32(); check_selection_f64(); check_selection_s8(); check_selection_u8();
+    check_selection_s16(); check_selection_u16(); check_selection_s32(); check_selection_u32();
+    check_selection_s64(); check_selection_u64();
+    check_selection_batches_f32(); check_selection_batches_f64();
     check_f32(); check_f64(); check_s8(); check_u8(); check_s16(); check_u16();
     check_s32(); check_u32(); check_s64(); check_u64(); check_environment(); check_nested_inactive_nan();
     puts("native mask reducers passed");

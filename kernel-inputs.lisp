@@ -142,16 +142,18 @@
          destination output-start count)
         (values type count (nreverse offsets) (nreverse phases) (nreverse spans) output-start)))))
 
-(defun unshift-declared-inputs (inputs specs offsets spans destination output-start count)
+(defun unshift-declared-inputs (inputs specs offsets spans destination output-start count
+                              &optional replay-p)
   "Return INPUTS, OFFSETS and SPANS with each unrepeated input whose slice is
-shifted against the destination's replaced by a copy; see UNSHIFTED-KERNEL-INPUT."
+shifted against the destination's replaced by a copy. REPLAY-P also snapshots
+exact aliases; see UNSHIFTED-KERNEL-INPUT."
   (if (null destination)
       (values inputs offsets spans)
       (loop for input in inputs for (nil repeat) in specs for offset in offsets for span in spans
             for (copy copy-offset) = (if (= repeat 1)
                                          (multiple-value-list
                                           (unshifted-kernel-input destination output-start
-                                                                  input offset count))
+                                                                  input offset count replay-p))
                                          (list input offset))
             collect copy into copies
             collect copy-offset into copy-offsets
@@ -411,10 +413,18 @@ shifted against the destination's replaced by a copy; see UNSHIFTED-KERNEL-INPUT
     (if (and (eq *backend* :native) *native-kernel-inputs-available-p* (not (eq reducer 'prod))
              (or (null strides) (eq reducer 'sum))
              (or (null strides) (and (plusp rows) (plusp count))))
-        (run-declared-native
-         (or (aref programs slot)
-             (setf (aref programs slot) (make-native-program bytes constants scratch type)))
-         type inputs specs offsets phases spans destination output-start rows count kind reducer strides)
+        (let ((result
+                (catch 'native-mask-replay
+                  (run-declared-native
+                   (or (aref programs slot)
+                       (setf (aref programs slot) (make-native-program bytes constants scratch type)))
+                   type inputs specs offsets phases spans destination output-start rows count kind reducer strides))))
+          (if (eq result :replay)
+              (let ((*backend* :lisp))
+                (execute-declared-kernel runners programs bytes constants scratch type inputs specs
+                                         offsets phases spans destination output-start rows count
+                                         kind reducer tree strides))
+              result))
         (let ((runner (aref runners slot)))
           (if strides
               (progn
@@ -529,7 +539,8 @@ shifted against the destination's replaced by a copy; see UNSHIFTED-KERNEL-INPUT
                                               (list ,@starts) ,(when destination 'destination-start))
                    (multiple-value-bind (,inputs ,offsets ,spans)
                        (unshift-declared-inputs (list ,@arguments) ',specs ,offsets ,spans
-                                                ,destination ,output-start ,count)
+                                                ,destination ,output-start ,count
+                                                ,(when (kernel-selection-p tree) '(eq *backend* :native)))
                      (execute-declared-kernel ,runners ,programs ',bytes ',constants ,scratch
                                               ,type ,inputs ',specs ,offsets ,phases ,spans
                                               ,destination ,output-start 1 ,count ',kind ',reducer ',tree))))))))))

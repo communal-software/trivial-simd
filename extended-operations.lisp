@@ -880,7 +880,7 @@ strides of DESTINATION then every operand, with NIL for scalars."
 
   (defun mask-kernel-dispatch-form (scalar programs program slot bytes constants scratch-count
                                     key foreign kind reduction destination arguments
-                                    d-offset input-offsets count tree name)
+                                    d-offset input-offsets count tree name &optional replay)
     #+(and sbcl x86-64)
     (when *sbcl-simd-available-p*
       (let ((packed (sbcl-mask-form tree key kind reduction destination arguments input-offsets
@@ -902,22 +902,32 @@ strides of DESTINATION then every operand, with NIL for scalars."
                                  (arithmetic-error () :replay))))
                  (if (eq ,result :replay)
                      (let ((*backend* :lisp))
-                       (,name ,@arguments :end ,count
+                       (,@(if replay `(funcall ,replay) (list name)) ,@arguments :end ,count
                               ,@(loop for argument in arguments for offset in input-offsets
                                       append (list (intern (format nil "~A-START" argument) :keyword) offset))))
                      ,result))
                ,scalar))
-        `(if (eq *backend* :native)
-             (let ((,program (or (aref ,programs ,slot)
-                                 (setf (aref ,programs ,slot)
-                                       (make-native-program ',bytes ',constants
-                                                            ,scratch-count ,key)))))
-               ,(if (eq kind :mask)
-                    (native-mask-kernel-form program foreign destination arguments
-                                             d-offset input-offsets count reduction)
-                    (native-kernel-form program foreign destination arguments
-                                        d-offset input-offsets count)))
-             ,scalar)))
+        (let ((result (gensym "RESULT")))
+          `(if (eq *backend* :native)
+               (let* ((,program (or (aref ,programs ,slot)
+                                    (setf (aref ,programs ,slot)
+                                          (make-native-program ',bytes ',constants ,scratch-count ,key))))
+                      (,result
+                        (catch 'native-mask-replay
+                          ,(if (eq kind :mask)
+                               (native-mask-kernel-form program foreign destination arguments
+                                                        d-offset input-offsets count reduction)
+                               (native-kernel-form program foreign destination arguments
+                                                   d-offset input-offsets count)))))
+                 (if (eq ,result :replay)
+                     (let ((*backend* :lisp))
+                       (,@(if replay `(funcall ,replay) (list name))
+                              ,@(when destination (list destination)) ,@arguments :end ,count
+                              ,@(when destination `(:destination-start ,d-offset))
+                              ,@(loop for argument in arguments for offset in input-offsets
+                                      append (list (intern (format nil "~A-START" argument) :keyword) offset))))
+                     ,result))
+               ,scalar))))
 
   (defun argument-index-result (reduction result form)
     "Turn the slice-relative index returned by FORM into START + index for ARGMIN and ARGMAX."
@@ -926,15 +936,16 @@ strides of DESTINATION then every operand, with NIL for scalars."
            (and ,result (+ (or start 0) ,result)))
         form))
 
-  (defun unshifted-kernel-inputs-forms (destination d-offset arguments offsets count)
+  (defun unshifted-kernel-inputs-forms (destination d-offset arguments offsets count &optional replay-p)
     "Forms replacing each of ARGUMENTS whose slice is shifted against DESTINATION's
-by a copy; see UNSHIFTED-KERNEL-INPUT."
+by a copy. REPLAY-P also snapshots exact aliases; see UNSHIFTED-KERNEL-INPUT."
     (when destination
       (loop for argument in arguments for offset in offsets
             collect `(when (or (eq ,argument ,destination)
                                (and (vector-view-p ,argument) (vector-view-p ,destination)))
                        (multiple-value-setq (,argument ,offset)
-                         (unshifted-kernel-input ,destination ,d-offset ,argument ,offset ,count))))))
+                         (unshifted-kernel-input ,destination ,d-offset ,argument ,offset ,count
+                                                ,(when replay-p '(eq *backend* :native))))))))
 
   (defun mask-kernel-expansion (name arguments expression)
     (unless arguments (error "A mask kernel needs input vectors"))
@@ -951,12 +962,14 @@ by a copy; see UNSHIFTED-KERNEL-INPUT."
            (index (gensym "INDEX")) (result (gensym "RESULT"))
            (values (loop for nil in arguments collect (gensym "VALUE")))
            (programs (gensym "PROGRAMS")) (program (gensym "PROGRAM"))
+           #+ecl (replay (gensym "REPLAY"))
            #+ecl (runners (gensym "RUNNERS"))
            (complex-kernel (gensym "COMPLEX-KERNEL"))
            (lowered (multiple-value-list
                      (lower-kernel (mask-kernel-tree body arguments)
                                    :share-p *native-mask-sharing-p*
-                                   :lazy-select-p (member reduction *kernel-reducers*))))
+                                   :lazy-select-p (or (member reduction *kernel-reducers*)
+                                                      (kernel-selection-p (mask-kernel-tree body arguments))))))
            (bytes (kernel-bytes (first lowered)))
            (constants (second lowered)) (scratch-count (third lowered)))
       (when (and reduction (/= 2 (length expression)))
@@ -987,7 +1000,8 @@ by a copy; see UNSHIFTED-KERNEL-INPUT."
                 (list ,@(when destination '(destination-start)) ,@starts) start end)
              (destructuring-bind (,@(when destination (list d-offset)) ,@input-offsets)
                  ,offsets
-              ,@(unshifted-kernel-inputs-forms destination d-offset arguments input-offsets count)
+              ,@(unshifted-kernel-inputs-forms destination d-offset arguments input-offsets count
+                                              (kernel-selection-p (mask-kernel-tree body arguments)))
               ,(staged-kernel-form
                 name reduction type destination d-offset arguments input-offsets
                 (if destination (cons 'destination-start starts) starts) count
@@ -1032,19 +1046,21 @@ by a copy; see UNSHIFTED-KERNEL-INPUT."
                                         ,destination)))
                                    programs program slot bytes constants scratch-count
                                    key foreign kind reduction destination arguments
-                                   d-offset input-offsets count (mask-kernel-tree body arguments) name))
+                                   d-offset input-offsets count (mask-kernel-tree body arguments) name
+                                   #+ecl replay))
                               (error (condition)
                                 `(error ,(princ-to-string condition))))
                          collect
                          `(,key
                            ,#+ecl
-                           (let ((parameters (append (list programs)
+                           (let ((parameters (append (list programs replay)
                                                      (when destination (list destination d-offset))
                                                      arguments input-offsets (list count))))
-                             `(funcall (or (aref ,runners ,slot)
-                                           (setf (aref ,runners ,slot)
-                                                 (eval '(lambda ,parameters ,form))))
-                                       ,@parameters))
+                             `(let ((,replay #',name))
+                                (funcall (or (aref ,runners ,slot)
+                                             (setf (aref ,runners ,slot)
+                                                   (eval '(lambda ,parameters ,form))))
+                                         ,@parameters)))
                            #-ecl form))))
                 (lambda (position)
                   `(kernel-tree-value (complex-kernel-tree ,complex-kernel) ,type (list ,@arguments)

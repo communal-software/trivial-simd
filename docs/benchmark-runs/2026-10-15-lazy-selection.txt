@@ -1,0 +1,38 @@
+Native lazy elementwise selection — 15 October 2026
+Apple M1, macOS ARM64, SBCL 2.6.8, Release native library, pointer access.
+Implementation base: 7fc342c plus the issue-81 lazy-selection fix.
+Command: sbcl --dynamic-space-size 4096 --script tests/selection-bench.lisp
+Three sequential fresh processes on an idle machine. Each timing is the median
+of three calibrated batches after warmup; input/result checks precede timing.
+Disjoint arrays; input alternates 4 and -1. Expression:
+  (select (> a 0) (sqrt (abs a)) 0)
+Eager control forces non-lazy lowering with otherwise identical code.
+All operands are valid in both branches of this measurement fixture.
+Units: microseconds per complete call, including native scratch allocation.
+
+Trial 1
+type,n,eager-us,lazy-us,lisp-us
+SINGLE-FLOAT,32,0.255,0.618,0.724
+SINGLE-FLOAT,1024,1.548,8.285,19.388
+SINGLE-FLOAT,65536,86.151,507.633,1647.469
+DOUBLE-FLOAT,32,0.264,0.673,0.715
+DOUBLE-FLOAT,1024,2.212,8.781,19.336
+DOUBLE-FLOAT,65536,131.797,542.320,1426.063
+
+Trial 2
+type,n,eager-us,lazy-us,lisp-us
+SINGLE-FLOAT,32,0.253,0.660,0.723
+SINGLE-FLOAT,1024,1.621,8.760,19.105
+SINGLE-FLOAT,65536,86.869,507.273,1208.953
+DOUBLE-FLOAT,32,0.262,0.672,0.719
+DOUBLE-FLOAT,1024,2.215,8.800,19.542
+DOUBLE-FLOAT,65536,132.295,542.195,1333.688
+
+Trial 3
+type,n,eager-us,lazy-us,lisp-us
+SINGLE-FLOAT,32,0.250,0.617,0.730
+SINGLE-FLOAT,1024,1.531,8.226,19.219
+SINGLE-FLOAT,65536,86.149,507.156,1211.969
+DOUBLE-FLOAT,32,0.263,0.673,0.718
+DOUBLE-FLOAT,1024,2.219,8.794,20.104
+DOUBLE-FLOAT,65536,131.945,542.648,1380.250
