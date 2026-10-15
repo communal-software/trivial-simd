@@ -70,6 +70,25 @@ an integer count or a boolean; they must be top-level forms.
 Complex expressions support equality and inequality, nested selections,
 `sum`, `prod`, `asum`, and `nrm2`; see [complex kernels](complex.md#kernels).
 
+## Selection
+
+`select` evaluates only the chosen branch at each element. Unselected negative
+square roots, zero denominators and invalid logarithms do not signal errors.
+Errors in the selected branch retain the ordinary arithmetic behavior.
+
+```lisp
+(trivial-simd:define-kernel positive-root (a)
+  (trivial-simd:select (> a 0) (sqrt a) 0))
+
+; Input #(1.0 -1.0) produces #(1.0 0.0).
+```
+
+Real/integer selections retain this behavior in slices, foreign views, row
+batches, declared inputs and reduction passes. Native execution masks inactive
+lanes and replays floating-point exceptions through Lisp.[^selection]
+[Nested reductions](kernel-passes.md) still execute before the pass that
+consumes their scalar results.
+
 ## Reduction kernels
 
 A top-level reducer returns a scalar instead of writing into a destination
@@ -290,3 +309,9 @@ for measurements and [FMA fallback limitations](#limitations).
     element type on first use. The helper receives the call's vectors and slice
     offsets, and uses the kernel's native-program cache. Redefinition creates a
     separate helper cache; retained older functions keep their own helpers.
+    Scalar replay receives the invoking kernel's closure, including local passes.
+
+[^selection]: Native lazy execution restores the caller's floating-point
+    environment before returning or replaying. Aliased selection inputs are
+    snapshotted before native writes so replay reads the original values.
+    Selection-free programs retain their ordinary VM path.

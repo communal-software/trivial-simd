@@ -1,0 +1,37 @@
+(require :asdf)
+(load (merge-pathnames "quicklisp/setup.lisp" (user-homedir-pathname)))
+(let ((root (merge-pathnames "../" (uiop:pathname-directory-pathname *load-truename*))))
+  (asdf:initialize-source-registry `(:source-registry (:directory ,root) :inherit-configuration))
+  (asdf:load-system "trivial-simd")
+  (load (merge-pathnames "tests/benchmark-timing.lisp" root)))
+(assert trivial-simd::*native-available-p*)
+
+;; Compile an eager control whose branches are safe for every input.
+(let ((original (symbol-function 'trivial-simd::lower-kernel)))
+  (unwind-protect
+       (progn
+         (setf (symbol-function 'trivial-simd::lower-kernel)
+               (lambda (tree &key lazy-select-p share-p)
+                 (declare (ignore lazy-select-p))
+                 (funcall original tree :lazy-select-p nil :share-p share-p)))
+         (eval '(trivial-simd:define-kernel eager-selection (a)
+                  (trivial-simd:select (> a 0) (sqrt (abs a)) 0))))
+    (setf (symbol-function 'trivial-simd::lower-kernel) original)))
+(trivial-simd:define-kernel lazy-selection (a)
+  (trivial-simd:select (> a 0) (sqrt (abs a)) 0))
+(let ((trivial-simd::*backend* :native))
+  (format t "~&type,n,eager-us,lazy-us,lisp-us~%")
+  (dolist (element '(single-float double-float))
+    (dolist (n '(32 1024 65536))
+      (let* ((a (make-array n :element-type element :initial-contents
+                            (loop for i below n collect (coerce (if (evenp i) 4 -1) element))))
+             (out (make-array n :element-type element)))
+        (eager-selection out a)
+        (assert (loop for i below n always (= (aref out i) (if (evenp i) 2 0))))
+        (lazy-selection out a)
+        (assert (loop for i below n always (= (aref out i) (if (evenp i) 2 0))))
+        (format t "~A,~D,~,3F,~,3F,~,3F~%" element n
+                (benchmark-time (lambda () (eager-selection out a)))
+                (benchmark-time (lambda () (lazy-selection out a)))
+                (let ((trivial-simd::*backend* :lisp))
+                  (benchmark-time (lambda () (lazy-selection out a)))))))))

@@ -14,6 +14,14 @@
 (trivial-simd:define-kernel larger-value (a b)
   (trivial-simd:select (> a b) a b))
 
+(trivial-simd:define-kernel positive-root (a)
+  (trivial-simd:select (> a 0) (sqrt a) 0))
+
+(let ((input (make-array 2 :element-type 'single-float :initial-contents '(1.0 -1.0)))
+      (output (make-array 2 :element-type 'single-float)))
+  (positive-root output input)
+  (format t "Positive roots: ~S~%" output))
+
 (let ((floats (make-array 2 :element-type 'single-float
                            :initial-contents '(1.0001 -1.0001)))
       (halves (make-array 2 :element-type '(unsigned-byte 16))))

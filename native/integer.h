@@ -198,6 +198,10 @@ static int ts_integer_kernel_##suffix(const uint8_t *code, size_t code_length, \
     type registers[TS_KERNEL_REGISTERS][TS_KERNEL_BLOCK], reduction[TS_KERNEL_BLOCK]; \
     type result = 0; \
     int status = 0; \
+    if (code_length && code[0] == TS_OP_LAZY) { \
+        status = ts_lazy_evaluate_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch, sum); \
+        goto done; \
+    } \
     for (size_t base = 0; base < n; base += TS_KERNEL_BLOCK) { \
         size_t m = n - base < TS_KERNEL_BLOCK ? n - base : TS_KERNEL_BLOCK; \
         for (size_t pc = 0; pc < code_length; pc += 4) { \
@@ -244,7 +248,7 @@ int ts_kernel_with_scratch_##suffix(const uint8_t *code, size_t code_length, con
                                    size_t scratch_count, type *scratch, size_t capacity) { \
     if (n && scratch_count && (!scratch || capacity < scratch_count)) return -1; \
     if (code_length && code[0] == TS_OP_LAZY) \
-        return ts_lazy_kernel_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch); \
+        return ts_lazy_evaluate_##suffix(code, code_length, constants, inputs, out, n, scratch_count, scratch, 0); \
     return ts_integer_kernel_##suffix(code, code_length, constants, inputs, out, n, scratch_count, 0, scratch); \
 } \
 int ts_kernel_sum_##suffix(const uint8_t *code, size_t code_length, const type *constants, \

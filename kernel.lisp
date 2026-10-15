@@ -74,7 +74,12 @@
     (error "Kernel scratch index ~D exceeds the 65,536-slot limit" index))
   index)
 
-(defun lower-kernel (tree &key lazy-select-p share-p)
+(defun kernel-selection-p (tree)
+  (and (consp tree)
+       (or (eq (first tree) :select)
+           (some #'kernel-selection-p (rest tree)))))
+
+(defun lower-kernel (tree &key (lazy-select-p (kernel-selection-p tree)) share-p)
   "Return instructions, constants, and scratch count. Instructions are (op dst a b).
 SPILL/RELOAD use a register and slot; other operands name registers or inputs."
   (when share-p
