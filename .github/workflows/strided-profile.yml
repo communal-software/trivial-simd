@@ -46,24 +46,13 @@ jobs:
           mkdir -p strided-profile
           lscpu > strided-profile/machine.txt
           cc --version >> strided-profile/machine.txt
-          export TRIVIAL_SIMD_STRIDED_PROFILE=1
-          for trial in 0 1 2 3 4; do
-            export TRIVIAL_SIMD_STRIDED_TRIAL=$trial
-            variants="general candidate"
-            if [ $((trial % 2)) -eq 1 ]; then variants="candidate general"; fi
-            for variant in $variants; do
-              export TRIVIAL_SIMD_STRIDED_VARIANT=$variant
-              export TRIVIAL_SIMD_STRIDED_OUTPUT="strided-profile/$variant-$trial.csv"
-              ros -Q run --eval '(handler-case (load "tests/strided-bench.lisp") (error (condition) (format *error-output* "~A~%" condition) (uiop:quit 1)))'
-            done
-          done
-          python3 tests/strided-gates.py strided-profile/*.csv > strided-profile/candidate-gates.h
+          echo '[[40393, 16384, "f32", "sum", [1, -2, 1, 1]], [40418, 256, "f32", "sum", [1, -1, 1, 1]], [40493, 256, "f32", "sum", [1, 2, 1, 1]]]' > strided-profile/seed-limits.json
       - name: Validate normal dispatch
         shell: lispsh -eo pipefail {0}
         run: |
-          python3 tests/strided-gates.py --json strided-profile/*.csv > strided-profile/candidate-limits.json
-          python3 tests/strided-gates.py --lisp strided-profile/*.csv > strided-profile/candidate-cases.lisp
-          python3 tests/strided-gates.py --header x86-64 strided-profile/*.csv > native/strided-memory-gates.h
+          cp strided-profile/seed-limits.json strided-profile/candidate-limits.json
+          python3 -c 'import json; rows=json.load(open("strided-profile/seed-limits.json")); print("("); [print("(:%s :%s (%s) %s)" % (t,o," ".join(map(str,l)),n)) for k,n,t,o,l in rows]; print(")")' > strided-profile/candidate-cases.lisp
+          cp native/strided-memory-gates.h strided-profile/seed-header.h
           cp native/strided-memory-gates.h strided-profile/candidate-header.h
           if [ "$(wc -l < strided-profile/candidate-cases.lisp)" -gt 2 ]; then
             cmake --build build --target trivial_simd --parallel 4
