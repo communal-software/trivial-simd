@@ -111,11 +111,39 @@ pointer and foreign-view access where measured. Unqualified layouts retain
 general execution. Final dispatch measurements include gate lookup and require no median
 regression above 5% in copy, alias and control cases.[^memory-method]
 
+## Qualified memory dispatch
+
+On Apple M1, normal dispatch admits these single-float layouts. Counts below
+these thresholds use general execution. Layouts list destination, left, right
+and fourth strides; unused positions remain `1`.
+
+| Operation | Layout | Minimum count |
+|---|---|---:|
+| negate, abs | (-1, -1, 1, 1) | 4,096 |
+| dot | (1, -2, -2, 1) | 4,096 |
+| dot, dot-wide | (1, -1, -1, 1) | 1,024 |
+| dot, dot-wide | (1, -1, 1, 1) | 1,024 |
+| dot, dot-wide | (1, -1, 2, 1) | 1,024 |
+| dot | (1, 2, 2, 1) | 1,024 |
+| dot-wide | (1, 2, 2, 1) | 4,096 |
+
+Five fresh process pairs on 2026-10-20 verify the exact 11-entry production
+table against general execution using the admission criteria above. Every
+entry passes the pointer/view gain criteria and copy, alias, short-call and
+unqualified-layout controls. Double-float and other layouts retain general
+execution. x86-64 specializations remain disabled pending qualifying normal
+dispatch measurements.
+
+Evidence: [paired measurements](benchmark-runs/2026-10-20-strided-dispatch-arm64.csv.gz),
+[qualified limits](benchmark-runs/2026-10-20-strided-dispatch-arm64-limits.json),
+[environment](benchmark-runs/2026-10-20-strided-dispatch-arm64-environment.json).
+These complete-call measurements do not establish inference-level speedups.
+
 ## Limitations
 
 - Specialized float transfers require complete-call admission on each
   architecture. Other types and unqualified layouts use general memory-lane
-  assembly; measurement and activation are tracked by
+  assembly. The admission scope is recorded in
   [#77](https://github.com/communal-software/trivial-simd/issues/77).
 - Non-native backends retain gathering or view staging for non-unit strides.
 - Integer division and exact conversions unsupported by native packs use scalar

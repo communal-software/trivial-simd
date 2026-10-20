@@ -172,6 +172,15 @@ For a local ARM64 native check, build the library first, then run:
 TRIVIAL_SIMD_BACKEND=native sbcl --dynamic-space-size 4096 --script tests/run.lisp
 ```
 
+## Stride dispatch validation
+
+The production ARM64 table passes 19 native tests, 887,130 SBCL checks and
+10 admission tests. General, forced-specialized and normal-dispatch variants
+also pass the layout and disjoint-interleaved-update checks on SBCL and CCL.
+The profiler derives temporary compiled-file extensions from the active Lisp.
+See [qualified memory dispatch](strided-performance.md#qualified-memory-dispatch)
+for the measured table and raw paired data.
+
 ## Strided GEMM
 
 GEMM tests cover signed and zero matrix strides, reversed and broadcast batches,

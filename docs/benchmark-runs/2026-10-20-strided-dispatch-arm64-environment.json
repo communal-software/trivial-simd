@@ -1,0 +1,16 @@
+{
+  "machine": "Apple M1",
+  "architecture": "arm64",
+  "os": "15.7.5",
+  "lisp": "SBCL 2.6.8",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.6.4.2)",
+  "baseline": "cd61d43c2986c05ac32503d7619b2e7b67d1b584",
+  "candidate_commits": [
+    "4e45020",
+    "4230136",
+    "b3d5813",
+    "7fc342c"
+  ],
+  "method": "Five fresh alternating general/dispatch pairs; normal dispatch includes gate lookup; three warmed batches per case, >=5 ms each; 32 extra allocation samples.",
+  "admission": "At least 10% median and 10% gain in four of five paired trials at every admitted size for pointer/view calls; copy, alias and controls tolerate at most 5% median regression."
+}

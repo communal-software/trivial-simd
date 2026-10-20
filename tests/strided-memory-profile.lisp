@@ -6,7 +6,7 @@
 (declaim (notinline trivial-simd::%native-strided-execute trivial-simd::%native-strided-reduce))
 (let ((source (merge-pathnames "../strided-execution.lisp"
                               (uiop:pathname-directory-pathname *load-truename*))))
-  (uiop:with-temporary-file (:pathname fasl :type "fasl")
+  (uiop:with-temporary-file (:pathname fasl :type (pathname-type (compile-file-pathname source)))
     (load (compile-file source :output-file fasl))))
 
 (defun strided-profile-bindings (variant function)
