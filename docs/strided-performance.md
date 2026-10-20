@@ -131,12 +131,18 @@ Five fresh process pairs on 2026-10-20 verify the exact 11-entry production
 table against general execution using the admission criteria above. Every
 entry passes the pointer/view gain criteria and copy, alias, short-call and
 unqualified-layout controls. Double-float and other layouts retain general
-execution. x86-64 specializations remain disabled pending qualifying normal
-dispatch measurements.
+execution. On AMD EPYC 9V45, normal dispatch qualifies three f32 sum layouts:
+stride -2 at 16,384 elements, stride -1 at 1,024 and stride +2 at 256.
+Five fresh pairs verify the pruned three-entry table; admission raises the
+reverse-sum floor from the measured 256 to 1,024. Other x86-64 layouts use
+general execution.
 
 Evidence: [paired measurements](benchmark-runs/2026-10-20-strided-dispatch-arm64.csv.gz),
 [qualified limits](benchmark-runs/2026-10-20-strided-dispatch-arm64-limits.json),
 [environment](benchmark-runs/2026-10-20-strided-dispatch-arm64-environment.json).
+x86-64 evidence: [paired measurements](benchmark-runs/2026-10-20-strided-dispatch-x86-64.csv.gz),
+[qualified limits](benchmark-runs/2026-10-20-strided-dispatch-x86-64-limits.json),
+[environment](benchmark-runs/2026-10-20-strided-dispatch-x86-64-environment.json).
 These complete-call measurements do not establish inference-level speedups.
 
 ## Limitations
@@ -150,7 +156,7 @@ These complete-call measurements do not establish inference-level speedups.
   evaluation. Complex square roots, reciprocals, magnitudes and norms use direct
   Lisp arithmetic.
 - Mixed storage in copy mode uses generic element access and can box values.
-- Measurements cover one M1. ARM64 and x86-64 correctness checks do not establish
+- Measurements cover one M1 and one EPYC runner. Correctness checks do not establish
   performance on other machines.
 
 [^packs]: General native operations use at most sixteen logical elements per
