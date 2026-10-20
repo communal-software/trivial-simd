@@ -54,11 +54,12 @@
   (funcall function)
   (let ((iterations 1)
         (minimum (max 1 (ceiling (* 0.005d0 internal-time-units-per-second)))))
-    (loop while (< (benchmark-batch function iterations) minimum)
-          do (setf iterations (* iterations 2)))
-    (second (sort (loop repeat 3 collect
-                   (/ (* 1000000d0 (benchmark-batch function iterations))
-                      internal-time-units-per-second iterations)) #'<))))
+    (loop
+      (let ((batches (loop repeat 3 collect (benchmark-batch function iterations))))
+        (when (every (lambda (elapsed) (>= elapsed minimum)) batches)
+          (return (/ (* 1000000d0 (second (sort batches #'<)))
+                     internal-time-units-per-second iterations))))
+      (setf iterations (* iterations 2)))))
 
 (defun strided-profile-call (operation out a b count starts steps)
   (destructuring-bind (ds ls rs cs) starts

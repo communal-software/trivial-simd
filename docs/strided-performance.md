@@ -176,7 +176,7 @@ These complete-call measurements do not establish inference-level speedups.
     snapshots and reduction accumulation order are unchanged.
 
 [^memory-method]: Profiling uses three warmed batches calibrated to at least
-    5 ms and alternates variant order across five fresh process pairs. Allocation
+    5 ms per batch and alternates variant order across five fresh process pairs. Allocation
     counters average 32 extra calls and have coarse granularity. Profiling
     libraries export distinct symbols; the harness disables CFFI compiler macros
     and recompiles only its strided caller so each binding reaches its intended
