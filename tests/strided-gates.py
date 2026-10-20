@@ -31,7 +31,8 @@ def load(paths):
     return rows
 
 
-def admissions(rows, variant):
+def admissions(rows, variant, limits=None):
+    floors = {(entry[2], entry[3], tuple(entry[4])): entry[1] for entry in (limits or [])}
     comparisons = defaultdict(list)
     for key, baseline in rows.items():
         if key[-1] != "general":
@@ -44,6 +45,8 @@ def admissions(rows, variant):
     for (type_, operation, layout, count, mode, offset), trials in comparisons.items():
         if any(s < -2 or s > 2 for s in layout) or all(s >= 0 and s <= 1 for s in layout):
             continue
+        if variant == "dispatch" and (type_, operation, layout) not in floors:
+            continue
         gains = [gain for _, gain in trials]
         if {trial for trial, _ in trials} != set(range(5)):
             raise ValueError("each case needs five distinct paired trials")
@@ -52,13 +55,21 @@ def admissions(rows, variant):
             and (mode not in ("pointer", "view") or sum(g >= .10 for g in gains) >= 4))
     accepted = []
     for (type_, operation, layout), cases in sorted(groups.items()):
+        sizes = [16, 64, 256, 1024, 4096, 16384, 65536]
         counts = sorted({key[0] for key in cases})
-        if counts != [16, 64, 256, 1024, 4096, 16384, 65536]:
-            raise ValueError(f"incomplete size sweep: {type_} {operation} {layout}")
-        expected = {(count, mode, offset) for count in counts
-                    for mode in (("pointer", "copy", "view", "alias") if variant == "dispatch" else
-                                 ("pointer", "copy", "view") if count in (1024, 65536) else ("pointer",))
-                    for offset in (0, 1)}
+        if variant == "dispatch":
+            floor = floors[type_, operation, layout]
+            previous = max((size for size in sizes if size < floor), default=16)
+            expected = {(count, mode, offset) for count in sizes for offset in (0, 1)
+                        for mode in ("pointer", "copy", "view", "alias")
+                        if count >= floor or (count in (16, previous) and mode in ("pointer", "view"))}
+            counts = [size for size in sizes if size >= floor]
+        else:
+            if counts != sizes:
+                raise ValueError(f"incomplete size sweep: {type_} {operation} {layout}")
+            expected = {(count, mode, offset) for count in counts
+                        for mode in (("pointer", "copy", "view") if count in (1024, 65536) else ("pointer",))
+                        for offset in (0, 1)}
         if set(cases) != expected:
             raise ValueError(f"incomplete access/offset sweep: {type_} {operation} {layout}")
         for threshold in counts:
@@ -107,12 +118,15 @@ def main():
     parser.add_argument("--header", choices=("arm64", "x86-64"), help="emit an architecture-gated C header")
     args = parser.parse_args()
     rows = load(args.csv)
-    accepted = admissions(rows, args.variant)
+    limits = None
     if args.variant == "dispatch":
         if not args.limits:
             parser.error("normal dispatch requires --limits candidate.json")
         with open(args.limits) as stream:
-            accepted = validate_dispatch(rows, accepted, json.load(stream))
+            limits = json.load(stream)
+    accepted = admissions(rows, args.variant, limits)
+    if limits is not None:
+        accepted = validate_dispatch(rows, accepted, limits)
     if args.json:
         print(json.dumps(accepted))
         return

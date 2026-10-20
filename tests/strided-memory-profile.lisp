@@ -99,9 +99,19 @@
       (otherwise (setf (fourth steps) 1)))
     steps))
 
-(defun strided-profile-selected-p (gates code operation)
-  (or (null gates)
-      (some (lambda (entry) (and (eq code (first entry)) (eq operation (second entry)))) gates)))
+(defun strided-profile-selected-p (gates code operation steps count mode)
+  (if (null gates) t
+      (let ((entry (find-if (lambda (entry) (and (eq code (first entry))
+                                                (eq operation (second entry))
+                                                (equal steps (third entry)))) gates)))
+        (if entry
+            (let* ((threshold (fourth entry))
+                   (previous (or (first (last (remove-if-not (lambda (size) (< size threshold))
+                                                            '(16 64 256 1024 4096 16384 65536)))) 16)))
+              (or (>= count threshold)
+                  (and (member count (list 16 previous)) (member mode '(:pointer :view)))))
+            (and (member count '(16 1024 65536)) (member mode '(:pointer :view))
+                 (some (lambda (entry) (and (eq code (first entry)) (eq operation (second entry)))) gates))))))
 
 (defun strided-profile-run ()
   (let ((variant (or (uiop:getenv "TRIVIAL_SIMD_STRIDED_VARIANT") "dispatch"))
@@ -152,7 +162,7 @@
                                                   (1 -1 2 -2) (2 -1 1 2) (1 1 1 1) (3 -3 3 -3)))
                                   (let ((steps (strided-profile-steps operation layout)))
                                     (unless (or (member steps seen :test #'equal)
-                                                (not (strided-profile-selected-p gates code operation)))
+                                                (not (strided-profile-selected-p gates code operation steps count mode)))
                                       (push steps seen)
                                       (when (eq mode :alias) (fill a (coerce 0 type)))
                                       (let* ((starts (mapcar (lambda (s) (+ offset (if (minusp s) (* (1- count) (- s)) 0))) steps))

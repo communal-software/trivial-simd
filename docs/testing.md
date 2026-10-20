@@ -56,7 +56,10 @@ conversion, invalid descriptors, and execution with all heap allocators disabled
 in SIMD and scalar builds. Run `examples/strides.lisp` for negative strides and
 strided BLAS calls. Lisp tests also cover concurrent disjoint interleaved
 updates. See [memory-path profiling](strided-performance.md#memory-path-profiling)
-for paired specialization trials. Run `tests/strided-bench.lisp` for complete-call timings and
+for paired specialization trials. With `BUILD_STRIDED_PROFILE=ON`,
+`sbcl --dynamic-space-size 4096 --script tests/strided-profile-check.lisp` checks
+Lisp calls through all three dispatch variants. `python3 tests/test-strided-gates.py`
+checks admission failure cases. Run `tests/strided-bench.lisp` for complete-call timings and
 allocated bytes; `TRIVIAL_SIMD_STRIDED_QUICK=1` restricts it to stride-two sum/add.
 
 Reduction tests cover `prod`, `minimum`, `maximum`, `argmin`, `argmax`, `asum`, `nrm2`

@@ -16,9 +16,10 @@ conversions. Required [overlap snapshots](api.md#overlap) remain.
 Unit-stride calls use their existing paths. Signed strides retain the
 [logical-count and physical-index rules](api.md#strides). Native arithmetic
 uses NEON/SSE2 packs; general strides assemble and scatter their lanes directly.
-Experimental float memory paths use packed reverse transfers and bounded
+Float memory paths use packed reverse transfers and bounded
 stride-two deinterleaving loads. Production dispatch admits only measured
-architecture/type/operation/layout combinations.[^memory]
+architecture/type/operation/layout combinations. Shorter calls retain general
+execution.[^memory]
 Scratch storage stays bounded independently of the element count.[^packs]
 
 Native strided integer operations pack wrapping arithmetic, bounded arithmetic,
@@ -87,10 +88,28 @@ widened f32 accumulation. It measures strides -1 and ±2, mixed layouts, scalar
 broadcasts, offsets, pointer/copy/view access and contiguous/general controls.
 The gathered baseline remains available through the original benchmark.
 
+```sh
+python3 tests/strided-gates.py --lisp /tmp/strided-profile/*.csv > /tmp/stride-cases.lisp
+python3 tests/strided-gates.py --json /tmp/strided-profile/*.csv > /tmp/stride-limits.json
+```
+
+Set `TRIVIAL_SIMD_STRIDED_GATES=/tmp/stride-cases.lisp` for targeted normal
+validation. Use `TRIVIAL_SIMD_STRIDED_VARIANT=general` and `dispatch` in five
+fresh paired processes, with `TRIVIAL_SIMD_STRIDED_PROFILE=1`, a trial number
+in `TRIVIAL_SIMD_STRIDED_TRIAL`, and a CSV path in
+`TRIVIAL_SIMD_STRIDED_OUTPUT`. The validation includes aliases, copy access,
+below-threshold calls and unqualified layout controls.
+
+```sh
+python3 tests/strided-gates.py --variant dispatch --limits /tmp/stride-limits.json \
+  /tmp/stride-validation/*.csv
+```
+
 Admission requires at least 10% median gain and at least 10% gain in four of
 five paired trials at the threshold and every larger measured size, for both
 pointer and foreign-view access where measured. Unqualified layouts retain
-general execution. Final dispatch measurements include gate lookup.
+general execution. Final dispatch measurements include gate lookup and require no median
+regression above 5% in copy, alias and control cases.[^memory-method]
 
 ## Limitations
 
@@ -127,3 +146,10 @@ general execution. Final dispatch measurements include gate lookup.
     destination's physical span use individual stride-two loads. Stores write only visited elements,
     preserving concurrent updates to disjoint interleaved slices. Scalar tails,
     snapshots and reduction accumulation order are unchanged.
+
+[^memory-method]: Profiling uses three warmed batches calibrated to at least
+    5 ms and alternates variant order across five fresh process pairs. Allocation
+    counters average 32 extra calls and have coarse granularity. Profiling
+    libraries export distinct symbols; the harness disables CFFI compiler macros
+    and recompiles only its strided caller so each binding reaches its intended
+    library. General and specialized libraries use the same compiler flags.

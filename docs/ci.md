@@ -97,7 +97,9 @@ lifetime-stress overhead is tracked in
 The **Strided profile** workflow runs manually or on native/profiler changes to
 `profile/strided-memory`. It checks C and Lisp correctness on x86-64 Linux and
 runs five paired general/specialized complete-call trials. The artifact contains
-CSV timings, candidate gate initializers and CPU/compiler details.
+CSV timings, candidate and validated gate headers, and CPU/compiler details.
+Candidate gates are checked against normal dispatch on the same runner;
+unqualified cases retain general execution.
 
 ```sh
 gh workflow run strided-profile.yml
