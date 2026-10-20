@@ -1,0 +1,34 @@
+-- The C compiler identification is AppleClang 17.0.0.17000604
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Configuring done (0.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: /tmp/encoded-format-specialization-2026-10-20/inference/after/build
+[ 22%] Building C object CMakeFiles/trivial_simd.dir/native/extended.c.o
+[ 22%] Building C object CMakeFiles/trivial_simd.dir/native/trivial_simd.c.o
+[ 33%] Building C object CMakeFiles/trivial_simd.dir/native/blas.c.o
+[ 44%] Building C object CMakeFiles/trivial_simd.dir/native/complex.c.o
+[ 55%] Building C object CMakeFiles/trivial_simd.dir/native/q8.c.o
+[ 66%] Building C object CMakeFiles/trivial_simd.dir/native/encoded-matmul.c.o
+[ 77%] Building C object CMakeFiles/trivial_simd.dir/native/packed-matmul.c.o
+[ 88%] Building C object CMakeFiles/trivial_simd.dir/native/fma.c.o
+[100%] Linking C shared library libtrivial_simd.dylib
+[100%] Built target trivial_simd
+[ 50%] Building C object CMakeFiles/native_encoded_matmul_test.dir/tests/native-encoded-matmul.c.o
+[100%] Linking C executable native_encoded_matmul_test
+[100%] Built target native_encoded_matmul_test
+[ 50%] Building C object CMakeFiles/native_encoded_matmul_scalar_test.dir/tests/native-encoded-matmul.c.o
+[100%] Linking C executable native_encoded_matmul_scalar_test
+[100%] Built target native_encoded_matmul_scalar_test
+Test project /tmp/encoded-format-specialization-2026-10-20/inference/after/build
+    Start 5: native-encoded-matmul
+1/2 Test #5: native-encoded-matmul ............   Passed    0.15 sec
+    Start 6: native-encoded-matmul-scalar
+2/2 Test #6: native-encoded-matmul-scalar .....   Passed    0.15 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   0.30 sec

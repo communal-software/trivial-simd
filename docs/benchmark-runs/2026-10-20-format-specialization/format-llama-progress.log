@@ -1,0 +1,6 @@
+pair 1 before
+Traceback (most recent call last):
+  File "/tmp/run-format-llama.py", line 18, in <module>
+    assert p.returncode==0 and len(rows)==3 and len(profiles)==1
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

@@ -1,0 +1,4 @@
+before scalar=False: ASan/UBSan and reference checks pass
+before scalar=True: ASan/UBSan and reference checks pass
+after scalar=False: ASan/UBSan and reference checks pass
+after scalar=True: ASan/UBSan and reference checks pass

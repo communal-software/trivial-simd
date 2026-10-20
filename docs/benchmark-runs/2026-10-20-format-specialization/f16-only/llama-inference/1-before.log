@@ -1,0 +1,4 @@
+PROFILE backend=:NATIVE source=#P"/private/tmp/encoded-format-specialization-2026-10-20/f16-only/inference/before/"
+VERIFY,F16,9822;374;12366;627
+RESULT,F16,PREFILL,5974.2790
+RESULT,F16,DECODE,4046.4110

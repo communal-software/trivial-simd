@@ -1,0 +1,368 @@
+{
+  "all_modes": {
+    "primitive": [
+      {
+        "encoding": "bf16",
+        "outputs": 1024,
+        "inputs": 1024,
+        "before_ms": 0.155688,
+        "after_ms": 0.155434,
+        "paired_reduction_percent": 0.1586506346025418
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 1024,
+        "inputs": 2048,
+        "before_ms": 0.309609,
+        "after_ms": 0.309484,
+        "paired_reduction_percent": 0.08077126869048268
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 1024,
+        "inputs": 3072,
+        "before_ms": 0.466234,
+        "after_ms": 0.468625,
+        "paired_reduction_percent": -0.5160664837769335
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 2048,
+        "inputs": 1024,
+        "before_ms": 0.311828,
+        "after_ms": 0.311406,
+        "paired_reduction_percent": 0.15319148936170368
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 2048,
+        "inputs": 8192,
+        "before_ms": 2.586,
+        "after_ms": 2.57775,
+        "paired_reduction_percent": 0.3142069898970479
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 3072,
+        "inputs": 1024,
+        "before_ms": 0.467109,
+        "after_ms": 0.466359,
+        "paired_reduction_percent": 0.16056209578492187
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 8192,
+        "inputs": 2048,
+        "before_ms": 3.224625,
+        "after_ms": 3.781125,
+        "paired_reduction_percent": -17.253685027152834
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 128256,
+        "inputs": 2048,
+        "before_ms": 50.348,
+        "after_ms": 59.453,
+        "paired_reduction_percent": -17.63661121307205
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 151936,
+        "inputs": 1024,
+        "before_ms": 23.58,
+        "after_ms": 33.457,
+        "paired_reduction_percent": -41.78090806187902
+      },
+      {
+        "encoding": "f16",
+        "outputs": 1024,
+        "inputs": 1024,
+        "before_ms": 0.157055,
+        "after_ms": 0.156719,
+        "paired_reduction_percent": 0.21393779249307965
+      },
+      {
+        "encoding": "f16",
+        "outputs": 1024,
+        "inputs": 2048,
+        "before_ms": 0.312484,
+        "after_ms": 0.312469,
+        "paired_reduction_percent": 0.002560065537682288
+      },
+      {
+        "encoding": "f16",
+        "outputs": 1024,
+        "inputs": 3072,
+        "before_ms": 0.471078,
+        "after_ms": 0.471672,
+        "paired_reduction_percent": -0.12269313555255401
+      },
+      {
+        "encoding": "f16",
+        "outputs": 2048,
+        "inputs": 1024,
+        "before_ms": 0.315281,
+        "after_ms": 0.314078,
+        "paired_reduction_percent": 0.36671171256906776
+      },
+      {
+        "encoding": "f16",
+        "outputs": 2048,
+        "inputs": 8192,
+        "before_ms": 2.6095,
+        "after_ms": 2.6175,
+        "paired_reduction_percent": -0.33540967896501517
+      },
+      {
+        "encoding": "f16",
+        "outputs": 3072,
+        "inputs": 1024,
+        "before_ms": 0.471437,
+        "after_ms": 0.470266,
+        "paired_reduction_percent": 0.24182976033397807
+      },
+      {
+        "encoding": "f16",
+        "outputs": 8192,
+        "inputs": 2048,
+        "before_ms": 3.350375,
+        "after_ms": 3.454125,
+        "paired_reduction_percent": -3.049873077497378
+      },
+      {
+        "encoding": "f16",
+        "outputs": 128256,
+        "inputs": 2048,
+        "before_ms": 52.435,
+        "after_ms": 53.915,
+        "paired_reduction_percent": -2.801563840945942
+      },
+      {
+        "encoding": "f16",
+        "outputs": 151936,
+        "inputs": 1024,
+        "before_ms": 23.768,
+        "after_ms": 24.105,
+        "paired_reduction_percent": -1.5008197755076225
+      }
+    ],
+    "inference": [
+      {
+        "phase": "PREFILL",
+        "before_ms": 2396.002,
+        "after_ms": 2385.431,
+        "paired_reduction_percent": 0.468363548945272,
+        "pair_reductions_percent": [
+          0.7430398991597587,
+          0.006497355366763546,
+          0.468363548945272
+        ]
+      },
+      {
+        "phase": "DECODE",
+        "before_ms": 139.291,
+        "after_ms": 133.074,
+        "paired_reduction_percent": 4.164026041366586,
+        "pair_reductions_percent": [
+          4.164026041366586,
+          3.0715994531784196,
+          4.848123712228347
+        ]
+      },
+      {
+        "phase": "GENERATE",
+        "before_ms": 2957.163,
+        "after_ms": 2930.563,
+        "paired_reduction_percent": 0.9812608163595415,
+        "pair_reductions_percent": [
+          0.8995107811101355,
+          0.9812608163595415,
+          2.7991032111968073
+        ]
+      }
+    ]
+  },
+  "native_f16_only": {
+    "primitive": [
+      {
+        "encoding": "bf16",
+        "outputs": 1024,
+        "inputs": 1024,
+        "before_ms": 0.155688,
+        "after_ms": 0.155691,
+        "paired_reduction_percent": 0.0
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 1024,
+        "inputs": 2048,
+        "before_ms": 0.309523,
+        "after_ms": 0.309523,
+        "paired_reduction_percent": -0.0025851399691800836
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 1024,
+        "inputs": 3072,
+        "before_ms": 0.463187,
+        "after_ms": 0.463125,
+        "paired_reduction_percent": 0.010147768786328282
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 2048,
+        "inputs": 1024,
+        "before_ms": 0.318281,
+        "after_ms": 0.317906,
+        "paired_reduction_percent": 0.11782041655014064
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 2048,
+        "inputs": 8192,
+        "before_ms": 3.502125,
+        "after_ms": 2.6355,
+        "paired_reduction_percent": 0.20620534215701758
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 3072,
+        "inputs": 1024,
+        "before_ms": 0.468578,
+        "after_ms": 0.4685,
+        "paired_reduction_percent": 0.016647777841805045
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 8192,
+        "inputs": 2048,
+        "before_ms": 3.3015,
+        "after_ms": 3.2575,
+        "paired_reduction_percent": 0.12647070095428425
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 128256,
+        "inputs": 2048,
+        "before_ms": 84.413,
+        "after_ms": 80.646,
+        "paired_reduction_percent": 1.737498781557656
+      },
+      {
+        "encoding": "bf16",
+        "outputs": 151936,
+        "inputs": 1024,
+        "before_ms": 24.295,
+        "after_ms": 24.277,
+        "paired_reduction_percent": -0.004119294776749882
+      },
+      {
+        "encoding": "f16",
+        "outputs": 1024,
+        "inputs": 1024,
+        "before_ms": 0.15707,
+        "after_ms": 0.15643,
+        "paired_reduction_percent": 0.3979497628219364
+      },
+      {
+        "encoding": "f16",
+        "outputs": 1024,
+        "inputs": 2048,
+        "before_ms": 0.312445,
+        "after_ms": 0.312242,
+        "paired_reduction_percent": 0.06753015653553351
+      },
+      {
+        "encoding": "f16",
+        "outputs": 1024,
+        "inputs": 3072,
+        "before_ms": 0.468719,
+        "after_ms": 0.467766,
+        "paired_reduction_percent": 0.18667901237202633
+      },
+      {
+        "encoding": "f16",
+        "outputs": 2048,
+        "inputs": 1024,
+        "before_ms": 0.317344,
+        "after_ms": 0.318656,
+        "paired_reduction_percent": 0.21979464989182462
+      },
+      {
+        "encoding": "f16",
+        "outputs": 2048,
+        "inputs": 8192,
+        "before_ms": 2.905125,
+        "after_ms": 4.061125,
+        "paired_reduction_percent": -1.27978606561292
+      },
+      {
+        "encoding": "f16",
+        "outputs": 3072,
+        "inputs": 1024,
+        "before_ms": 0.472953,
+        "after_ms": 0.47075,
+        "paired_reduction_percent": 0.44270613107821877
+      },
+      {
+        "encoding": "f16",
+        "outputs": 8192,
+        "inputs": 2048,
+        "before_ms": 5.96325,
+        "after_ms": 5.92375,
+        "paired_reduction_percent": -4.07041155471668
+      },
+      {
+        "encoding": "f16",
+        "outputs": 128256,
+        "inputs": 2048,
+        "before_ms": 90.36,
+        "after_ms": 91.463,
+        "paired_reduction_percent": 0.578706366920545
+      },
+      {
+        "encoding": "f16",
+        "outputs": 151936,
+        "inputs": 1024,
+        "before_ms": 24.411,
+        "after_ms": 24.307,
+        "paired_reduction_percent": 0.5234732031574652
+      }
+    ],
+    "inference": [
+      {
+        "phase": "PREFILL",
+        "before_ms": 2387.21,
+        "after_ms": 2385.825,
+        "paired_reduction_percent": 0.058017518358255415,
+        "pair_reductions_percent": [
+          0.233247614834875,
+          0.002725025248406787,
+          0.058017518358255415
+        ]
+      },
+      {
+        "phase": "DECODE",
+        "before_ms": 139.311,
+        "after_ms": 136.371,
+        "paired_reduction_percent": 2.110386114520746,
+        "pair_reductions_percent": [
+          2.032920097338964,
+          2.3617585885390535,
+          2.110386114520746
+        ]
+      },
+      {
+        "phase": "GENERATE",
+        "before_ms": 2943.044,
+        "after_ms": 2924.235,
+        "paired_reduction_percent": 0.2905118225013714,
+        "pair_reductions_percent": [
+          -0.01996498657457213,
+          0.700329318895665,
+          0.2905118225013714
+        ]
+      }
+    ]
+  }
+}

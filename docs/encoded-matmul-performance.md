@@ -19,7 +19,7 @@ Direct calls use stack-sized tiles and require no f32 weight allocation. The com
 
 ## Single-row ARM64 tiles
 
-Single-row decode uses four-output tiles. The [wider-tile profile](encoded-decode-tiles.md) compares 8/12/16 outputs on Qwen and Llama shapes and checks complete Qwen inference. It does not establish a wider global tile choice.
+Single-row decode uses four-output tiles. The [wider-tile profile](encoded-decode-tiles.md) compares 8/12/16 outputs on Qwen and Llama shapes and checks complete Qwen inference. It does not establish a wider global tile choice. [Conversion-mode specialization](encoded-format-specialization.md) records a modest native-F16 Qwen decode gain with cross-model validation pending.
 
 ## Native x86-64
 
