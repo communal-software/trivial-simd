@@ -176,8 +176,9 @@ TRIVIAL_SIMD_BACKEND=native sbcl --dynamic-space-size 4096 --script tests/run.li
 
 The production ARM64 table passes 19 native tests, 887,130 SBCL checks and
 10 admission tests. General, forced-specialized and normal-dispatch variants
-also pass the layout and disjoint-interleaved-update checks on SBCL and CCL.
-The profiler derives temporary compiled-file extensions from the active Lisp.
+also pass the layout and disjoint-interleaved-update checks on SBCL, CCL and ECL.
+The profiler derives temporary compiled-file extensions from the active Lisp
+and retains profiling libraries for the process lifetime.
 See [qualified memory dispatch](strided-performance.md#qualified-memory-dispatch)
 for the measured table and raw paired data.
 

@@ -9,6 +9,9 @@
   (uiop:with-temporary-file (:pathname fasl :type (pathname-type (compile-file-pathname source)))
     (load (compile-file source :output-file fasl))))
 
+;; ECL foreign bindings can outlive an unloaded profiling library.
+(defvar *strided-profile-libraries* (make-hash-table :test #'equal))
+
 (defun strided-profile-bindings (variant function)
   (if (member variant '("dispatch" "gathered") :test #'string=)
       (if (string= variant "gathered")
@@ -23,7 +26,9 @@
                      (:linux (format nil "build/libnative_strided_~A.so" variant))
                      ((:windows :win) (format nil "build/native_strided_~A.dll" variant))))
              (path (merge-pathnames name (asdf:system-source-directory :trivial-simd)))
-             (library (cffi:load-foreign-library path))
+             (library (or (gethash path *strided-profile-libraries*)
+                          (setf (gethash path *strided-profile-libraries*)
+                                (cffi:load-foreign-library path))))
              (execute (cffi:foreign-symbol-pointer (format nil "ts_strided_~A_execute" variant) :library library))
              (reduce (cffi:foreign-symbol-pointer (format nil "ts_strided_~A_reduce" variant) :library library))
              (old-execute (symbol-function 'trivial-simd::%native-strided-execute))
@@ -43,8 +48,7 @@
                          :int64 ls :int64 rs :int wide :pointer result :pointer wide-result :pointer index :int)))
                (funcall function))
           (setf (symbol-function 'trivial-simd::%native-strided-execute) old-execute
-                (symbol-function 'trivial-simd::%native-strided-reduce) old-reduce)
-          (cffi:close-foreign-library library)))))
+                (symbol-function 'trivial-simd::%native-strided-reduce) old-reduce)))))
 
 (defun strided-profile-time (function)
   (funcall function)
