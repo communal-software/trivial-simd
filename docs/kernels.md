@@ -213,6 +213,9 @@ for measurements and [FMA fallback limitations](#limitations).
 
 ## Limitations
 
+- Reusable expression kernels have no general N-D execution interface accepting
+  per-input shape layouts and signed/zero strides. Tensor adapters pack irregular
+  inputs or use row batches: [N-D expression interface](https://github.com/communal-software/trivial-simd/issues/88).
 - Transcendental math uses scalar system routines. See its
   [numerical and execution limitations](kernel-transcendentals.md#limitations).
 - Numeric selection reducers retain scalar execution where native complete calls
