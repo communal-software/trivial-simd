@@ -1,0 +1,35 @@
+[
+  {
+    "phase": "PREFILL",
+    "before_ms": 2421.762,
+    "after_ms": 2926.897,
+    "paired_reduction_percent": -7.746736561554379,
+    "pair_reductions_percent": [
+      -2.383636377150178,
+      -83.54702835708324,
+      -7.746736561554379
+    ]
+  },
+  {
+    "phase": "DECODE",
+    "before_ms": 138.79,
+    "after_ms": 165.194,
+    "paired_reduction_percent": -6.5369087696216965,
+    "pair_reductions_percent": [
+      -2.0837236112111857,
+      -53.83882836736164,
+      -6.5369087696216965
+    ]
+  },
+  {
+    "phase": "GENERATE",
+    "before_ms": 2993.026,
+    "after_ms": 3505.206,
+    "paired_reduction_percent": -3.2765877752316763,
+    "pair_reductions_percent": [
+      -3.2765877752316763,
+      -65.47370453848383,
+      -1.9357641766720723
+    ]
+  }
+]

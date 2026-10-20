@@ -1,0 +1,15 @@
+[ 50%] Building C object CMakeFiles/native_encoded_matmul_test.dir/tests/native-encoded-matmul.c.o
+[100%] Linking C executable native_encoded_matmul_test
+[100%] Built target native_encoded_matmul_test
+[ 50%] Building C object CMakeFiles/native_encoded_matmul_scalar_test.dir/tests/native-encoded-matmul.c.o
+[100%] Linking C executable native_encoded_matmul_scalar_test
+[100%] Built target native_encoded_matmul_scalar_test
+Test project /Users/george/git/trivial-simd/build
+    Start 5: native-encoded-matmul
+1/2 Test #5: native-encoded-matmul ............   Passed    0.15 sec
+    Start 6: native-encoded-matmul-scalar
+2/2 Test #6: native-encoded-matmul-scalar .....   Passed    0.16 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   0.31 sec

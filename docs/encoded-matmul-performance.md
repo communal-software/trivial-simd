@@ -17,6 +17,10 @@ SBCL 2.6.8, native NEON, pointer access, 8192×2048 weight rows; median millisec
 
 Direct calls use stack-sized tiles and require no f32 weight allocation. The comparison reuses a 256×2048 f32 scratch buffer and includes conversion and every BLAS call. Its Lisp metadata allocation is approximately 35–37 KB per call.[^allocation]
 
+## Single-row ARM64 tiles
+
+Single-row decode uses four-output tiles. The [wider-tile profile](encoded-decode-tiles.md) compares 8/12/16 outputs on Qwen and Llama shapes and checks complete Qwen inference. It does not establish a wider global tile choice.
+
 ## Native x86-64
 
 Intel Xeon 6973P-C GitHub runner, SBCL 2.6.9, native pointer access; the same matrix size and five-process method. Encoded matmul uses SSE2; the native BLAS comparison uses its available AVX/FMA path. [Raw measurements](benchmark-runs/2026-10-12-encoded-matmul-linux.txt) and [profile run](https://github.com/communal-software/trivial-simd/actions/runs/38310528630).

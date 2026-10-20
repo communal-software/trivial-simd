@@ -62,6 +62,31 @@ static void shapes(int f16) {
     }
 }
 
+static void single_row_shapes(int f16) {
+    uint16_t weights[35 * 73 + 3];
+    float x[73], out[40];
+    for (unsigned i = 0; i < sizeof weights / sizeof *weights; ++i)
+        weights[i] = f16 ? (uint16_t)(0x3000 + i % 2048) : (uint16_t)(0x3c00 + i % 512);
+    for (unsigned i = 0; i < sizeof x / sizeof *x; ++i) x[i] = (float)((int)(i % 17) - 8) / 8;
+    for (int64_t m = 0; m <= 35; ++m) {
+        for (int64_t k = 0; k <= 69; ++k) {
+            for (unsigned i = 0; i < sizeof out / sizeof *out; ++i) out[i] = -7;
+            assert(!ts_encoded_matmul(f16, 1, m, k, weights + 3, 73, x + 2, 71, out + 1, m + 3));
+            for (int j = 0; j < m; ++j) {
+                double expected = 0, scale = 0;
+                for (int e = 0; e < k; ++e) {
+                    double term = x[2 + e] * reference_weight(weights[3 + j * 73 + e], f16);
+                    expected += term;
+                    scale += fabs(term);
+                }
+                assert(fabs(out[j + 1] - expected) <= 8 * FLT_EPSILON * scale);
+            }
+            assert(out[0] == -7);
+            for (int j = (int)m + 1; j < 40; ++j) assert(out[j] == -7);
+        }
+    }
+}
+
 static void exceptional_tiles(int f16) {
     uint16_t weights[4];
     float x[8], out[2];
@@ -83,6 +108,7 @@ int main(void) {
     for (int f16 = 0; f16 <= 1; ++f16) {
         all_encodings(f16);
         shapes(f16);
+        single_row_shapes(f16);
         exceptional_tiles(f16);
     }
 #if defined(__aarch64__) && !defined(TS_SCALAR)

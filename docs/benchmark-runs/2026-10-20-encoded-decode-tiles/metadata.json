@@ -1,0 +1,63 @@
+{
+  "revisions": {
+    "trivial-simd": "26bb84d9afaeb146b5e92c1b27f594268914e159",
+    "cl-tensor": "09264355dabfabde8b6782720c58e309514457d0",
+    "cl-inference": "38f0a96e7e7c45741345e6ae032d24ea4966bdd6"
+  },
+  "candidate": "ARM64 single-row width 8; baseline width 4; full source archives from the recorded trivial-simd revision; only the first ARM64 encoded_tile1 macro invocation differs",
+  "admission": "No kernel change admitted. Runtime remains four outputs per tile.",
+  "native_libraries_sha256": {
+    "before": "bb57ca4a63933aa75223c1c3a22e07d33e91bb0cbd89b90fcd59dc21dfbb5973",
+    "after": "558970601faa35ba0cdfccca051e9ae403ac0ecb022565c9ccd338235afdcb44"
+  },
+  "validation": "All 19 current native CTests pass. Four widths each pass ASan/UBSan and reference checks in SIMD and scalar builds. Sweep checks exact finite output equality. All six inference processes validate four greedy tokens.",
+  "original_bytes_sha256_before_whitespace_normalization": {
+    "inference/after-CMakeCache.txt": "64ae8e62e7b45de0e2e4ec3d8c376584c1220b54f290cc9e9c29592f574fcf1f",
+    "inference/before-CMakeCache.txt": "eae7424c22d668b3b142f9be6e9e59e740b9b3ff0a82b973fc537935539d55eb"
+  },
+  "artifact_formatting": "Logs, CSV and cache text use LF line endings with trailing whitespace removed; original byte hashes are retained for changed files.",
+  "files_sha256": {
+    "encoded-decode-validation.log": "4fa5521962c514cf1b4e3159a973abc1f2d7617205ba9909a37f55a716d125ae",
+    "validate-encoded-widths.py": "4a14b9e84c92b3358d07b59ba926e0b645bf65f7f4447729e6953b6f2c0602ed",
+    "run-encoded-inference.py": "b361c52ce0faaad6f8e98e1b162cee13149c0d9f073a6696537cb87ccc7db687",
+    "encoded-tile-sweep.c": "6d26dadb72a374ccdd8e1d5216eafd84c31f510259d97ddf18b89fdaa634f625",
+    "build-encoded-inference.py": "8903e39bafbed754934830b8117afc23771b00becbb1944210ae0a1015420460",
+    "copy-inference-bench.lisp": "f12652cbf0c2aeae8e9c8a515798ad7cd733bad1db84b16448e21d883f90cec3",
+    "encoded-tile-native-suite.log": "ee074af99f12e0caedc713a93c70122520244e7a28d41118de2d02b2386a1374",
+    "run-encoded-tile-sweep.py": "aa72b84b8bac5e004b2c663ed7fbb265e270391b4d6953f6155b19bda8d9e81d",
+    "sweep/summary.json": "7a66093c02a99b056025642b1c4ec5e3d6d3603e4a7d368d97f8df727a436e54",
+    "sweep/encoded-8.c": "424e02ef75f7edeb579d4d3197f111e167c761111bdbf60df4da16b7a1ecd786",
+    "sweep/candidate-validation.log": "612a61758ab4f861be2815a82af3cc0446c4a13c14c28276556b0dcdc5627a96",
+    "sweep/metadata.json": "02ee54452470990f8b680b0d28fe3a72841aad9903c5caf06b9129f1739cebfe",
+    "sweep/encoded-12.c": "c695b1ad6e3b9897628d95de2fe471e7980f676183be915f314dded2f613bb87",
+    "sweep/test-4.c": "66a39a030dc838f3e9c820bbe285b9b71d2a9374290665f0c00364e5e29c8d14",
+    "sweep/encoded-16.c": "dacdd2c436a792ced5dbd1599a2641651599ed7deb7c783ad34bff51721b7d34",
+    "sweep/test-16.c": "cb5d6182ee6f751401813d14f5011d211bf3475067a9f4546f5547a98b3bb614",
+    "sweep/encoded-4.c": "528fbb64d19bb5df58f2cbdff8620e94f1b6f8d0a1eefdc840309f9a2f4180c1",
+    "sweep/test-12.c": "4bff0a242824214713194cdae2e48f8a57778fbfa45c7f43b7a97ca7b4dfabaa",
+    "sweep/results.csv": "8e5d96d9abc6b0273b5f3a3f23fc5456aceb2db5c489ca23fefdf9f87bd6e061",
+    "sweep/test-8.c": "6d224f1c2da5afefbbecc072387dc9ff5114816657181350966dccd1ae9bc60f",
+    "inference/3-before.log": "be19ba46780a395ed8d43723163b336cba4def11e9243141d582a249dc3941b5",
+    "inference/3-after.log": "3477ffa679e34bd96875006f285818e9e9fc8c011cb3a414bb95ccd81deb22ed",
+    "inference/summary.json": "8f60902134af77a2fb4f1e39527ff5f227822648a6526b1507bb6617667c6f74",
+    "inference/after-encoded-matmul.c": "424e02ef75f7edeb579d4d3197f111e167c761111bdbf60df4da16b7a1ecd786",
+    "inference/before-build.log": "c76706c8a041b29a936db76421397ed09c85e157b1481958950857ae8b7ef176",
+    "inference/1-before-environment.json": "6dc816b4894cb4fb217f3d79a93e71a95b830dc9bdd91689556f61747c1e31fd",
+    "inference/1-before.log": "9745f90090c9459a8f0015ddafe46752c23192bea548cd648fccfe15819738d2",
+    "inference/revision.txt": "3513757b00109849a0346cd4b9881d290fa6ab0a10ffa68b47374113cf950525",
+    "inference/2-after.log": "2aab6662175aaaf2c14d259adfd1a1da17a3dc8d1680128cdd636226211343b4",
+    "inference/after-CMakeCache.txt": "17899857d6b658ccdd145204f3ce3fda820b0e09a5400b2c6603d3ce086af0d6",
+    "inference/2-before-environment.json": "60f41d5fc3d932a22bab7dbb71552833bdb40ed402cacbaab338577ef1e7f7a9",
+    "inference/before-CMakeCache.txt": "28633639eded20dbffbdbd1e01c18a68ddc33c8760a184fb45521294e8ba42ee",
+    "inference/1-after.log": "29cf5b9e1f2deae7a668c410756657cda27d260cb6fa40fb6fc7cb7b0a5130db",
+    "inference/inference-bench.lisp": "d496e126f3eb8f99648dd0f02eb528a281ad63d83e1ea49571fc39e545e32da7",
+    "inference/3-after-environment.json": "2921d24727ff5211091aedec46357a2695bc31d0ce5eacc011044186fcbb2fe7",
+    "inference/2-before.log": "968e01ca95d55e9245d4f934c865569539c1332d02adaa18646a604dc69f24f9",
+    "inference/after-build.log": "5e29487f46e31495d2de49afd351b64515956d0430cfb4a89160d48977992f61",
+    "inference/3-before-environment.json": "950a2677fcec64b28c575ebfd721cef80f5ab8c2fa005208d02466157f323915",
+    "inference/2-after-environment.json": "1a11f531b857b7e8d71c7b2ca25515855926dbb2ddfc818889b53af85b8809ff",
+    "inference/results.csv": "b88bebf5df34da6eea1d46a6a562979924582508f438b39ef9b7cd8595289021",
+    "inference/1-after-environment.json": "1a02438e903f087527b94199540fff269c83747c01f9cff91f92248fca83cbe1",
+    "inference/before-encoded-matmul.c": "528fbb64d19bb5df58f2cbdff8620e94f1b6f8d0a1eefdc840309f9a2f4180c1"
+  }
+}

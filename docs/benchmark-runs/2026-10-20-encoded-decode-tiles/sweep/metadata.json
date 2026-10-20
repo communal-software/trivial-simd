@@ -1,0 +1,21 @@
+{
+  "revision": "26bb84d9afaeb146b5e92c1b27f594268914e159",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.6.4.2)\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+  "flags": [
+    "-O3",
+    "-ffp-contract=off"
+  ],
+  "method": "Five rotating width sweeps per encoding/shape in one process. Each cell is median of three batches calibrated to at least 20 ms, after warmup. Every candidate output must exactly match the four-output baseline for nonconstant finite fixtures.",
+  "files_sha256": {
+    "encoded-8.c": "424e02ef75f7edeb579d4d3197f111e167c761111bdbf60df4da16b7a1ecd786",
+    "tile-16.dylib": "366e4357d96b750c88e17a3298bf30e07a3e24c4cd3e5fb3dd30bce57e7d7af4",
+    "encoded-12.c": "c695b1ad6e3b9897628d95de2fe471e7980f676183be915f314dded2f613bb87",
+    "tile-12.dylib": "348e21bfe0d3e18164a97e9b9d29a918e646dec939c024be52b63fde8c9db18f",
+    "encoded-16.c": "dacdd2c436a792ced5dbd1599a2641651599ed7deb7c783ad34bff51721b7d34",
+    "tile-4.dylib": "67731b20d5944c8e10665404332e5db498b0dc261766a12f03d27adc83026801",
+    "tile-8.dylib": "93c91e2274e8443730273552a15a50ff89cbbd0439be7c8e307e6f97732f8ec8",
+    "sweep": "fc7331d3668a23119ed3657d88bd6041f8ba7518cc20a988b18fd3fd9ba40d6d",
+    "encoded-4.c": "528fbb64d19bb5df58f2cbdff8620e94f1b6f8d0a1eefdc840309f9a2f4180c1",
+    "results.csv": "8e5d96d9abc6b0273b5f3a3f23fc5456aceb2db5c489ca23fefdf9f87bd6e061"
+  }
+}
