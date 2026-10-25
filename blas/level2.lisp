@@ -283,15 +283,23 @@
 
 (defun call-mv-general (type code trans conj alpha a base row-major ld kl ku rows cols
                         x xstart incx beta y ystart incy ylen)
-  (if (and (= code 0) (native-level2-p type (* rows cols)))
-      (multiple-value-bind (ars acs) (operated-strides row-major ld trans)
-        (call-native-blas type (trivial-simd::%native-blas-gemv-f32
-                                trivial-simd::%native-blas-gemv-f64)
-            ((ap a base) (xp x xstart) (yp y ystart))
-          ylen (if trans rows cols) alpha ap ars acs xp incx beta yp incy))
-      (funcall (find-kernel 'mv-general-kernel type)
-               code trans conj alpha a base row-major ld kl ku rows cols
-               x xstart incx beta y ystart incy ylen))
+  (cond
+    ((and (= code 0) (native-level2-p type (* rows cols)))
+     (multiple-value-bind (ars acs) (operated-strides row-major ld trans)
+       (call-native-blas type (trivial-simd::%native-blas-gemv-f32
+                               trivial-simd::%native-blas-gemv-f64)
+           ((ap a base) (xp x xstart) (yp y ystart))
+         ylen (if trans rows cols) alpha ap ars acs xp incx beta yp incy)))
+    ((and (= code 2) (not conj) (native-level2-p type (* rows cols)))
+     (call-native-blas type (trivial-simd::%native-blas-gbmv-f32
+                             trivial-simd::%native-blas-gbmv-f64)
+         ((ap a base) (xp x xstart) (yp y ystart))
+       (if trans 1 0) rows cols kl ku alpha ap ld (if row-major 1 0)
+       xp incx beta yp incy))
+    (t
+     (funcall (find-kernel 'mv-general-kernel type)
+              code trans conj alpha a base row-major ld kl ku rows cols
+              x xstart incx beta y ystart incy ylen)))
   nil)
 
 (defun call-triangular-solve (type code upper unit trans conj a base row-major ld k n

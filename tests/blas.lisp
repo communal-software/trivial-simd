@@ -62,7 +62,8 @@
 
 (defun reference-blas-available-p ()
   (loop for library in '("/System/Library/Frameworks/Accelerate.framework/Accelerate"
-                         "libopenblas.so" "libblas.so.3" "libblas.so")
+                         "libopenblas.so" "libblas.so.3" "libblas.so"
+                         "libopenblas.dll" "openblas.dll")
         thereis (handler-case
                     (progn
                       (cffi:load-foreign-library library)

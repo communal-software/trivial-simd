@@ -506,8 +506,9 @@
                                         (arg-pointer xb) (arg-int incx)
                                         (arg-scalar type beta)
                                         (arg-pointer yb) (arg-int incy))
-                            (funcall (blas-routine type "gbmv") transpose alpha a x
-                                     incx beta y incy)
+                            (let ((trivial-simd/blas::*native-blas-level2-threshold* 1))
+                              (funcall (blas-routine type "gbmv") transpose alpha a x
+                                       incx beta y incy))
                             (check-case (list type layout transpose shape increments)
                                         (and (result-matches-p y type)
                                              (result-matches-p a type)))))))))))))))))

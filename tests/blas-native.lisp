@@ -234,6 +234,37 @@
                     (is (vectors-close-p y expected type)
                         "gemv ~S ~S ~S ~S ~S" type layout transpose increments shape)))))))))))
 
+(test blas-native-gbmv-matches-lisp
+  (when (native-blas-usable-p)
+    (dolist (layout '(:row-major :column-major))
+      (dolist (transpose '(:no-transpose :transpose))
+        (dolist (increments '((1 1) (2 -3) (-1 1)))
+          (dolist (shape '((1 1 0 0) (7 5 2 1) (40 33 0 3) (130 70 4 2)))
+            (destructuring-bind (rows cols kl ku) shape
+              (destructuring-bind (incx incy) increments
+                (let* ((width (+ kl ku 1))
+                       (ld (+ width 2))
+                       (major (if (eq layout :row-major) rows cols))
+                       (offset 3)
+                       (data (blas-filled-vector 'double-float
+                                                 (+ offset (* major ld) 2)))
+                       (view (trivial-simd/blas:make-band-matrix-view
+                              data rows cols :kl kl :ku ku :layout layout
+                              :leading-dimension ld :offset offset))
+                       (m (if (eq transpose :no-transpose) rows cols))
+                       (n (if (eq transpose :no-transpose) cols rows))
+                       (x (padded-vector 'double-float n incx))
+                       (y (padded-vector 'double-float m incy))
+                       (expected (copy-seq y)))
+                  (with-blas-path (:lisp)
+                    (trivial-simd/blas:dgbmv transpose 0.75d0 view x incx
+                                             0.5d0 expected incy))
+                  (with-blas-path (:native)
+                    (trivial-simd/blas:dgbmv transpose 0.75d0 view x incx
+                                             0.5d0 y incy))
+                  (is (vectors-close-p y expected 'double-float)
+                      "gbmv ~S ~S ~S ~S ~S" layout transpose increments shape))))))))))
+
 (test blas-native-ger-matches-lisp
   (when (native-blas-usable-p)
     (dolist (type *native-blas-types*)

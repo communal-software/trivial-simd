@@ -499,6 +499,12 @@ static void ts_blas_axpy_##suffix(int64_t n, type scale, const type *src, int64_
     int64_t i = 0; \
     if (sinc == 1 && dinc == 1) { \
         vector factor = splat(scale); \
+        for (; i + 4 * (width) <= n; i += 4 * (width)) { \
+            store(dst + i, muladd(load(dst + i), load(src + i), factor)); \
+            store(dst + i + (width), muladd(load(dst + i + (width)), load(src + i + (width)), factor)); \
+            store(dst + i + 2 * (width), muladd(load(dst + i + 2 * (width)), load(src + i + 2 * (width)), factor)); \
+            store(dst + i + 3 * (width), muladd(load(dst + i + 3 * (width)), load(src + i + 3 * (width)), factor)); \
+        } \
         for (; i + (width) <= n; i += (width)) \
             store(dst + i, muladd(load(dst + i), load(src + i), factor)); \
         for (; i < n; ++i) dst[i] += scale * src[i]; \
@@ -521,6 +527,48 @@ int ts_blas_gemv_##suffix(int64_t m, int64_t n, type alpha, const type *a, int64
     } else { \
         for (int64_t j = 0; j < n; ++j) \
             ts_blas_axpy_##suffix(m, alpha * x[j * incx], a + j * acs, ars, y, incy); \
+    } \
+    return 0; \
+} \
+\
+int ts_blas_gbmv_##suffix(int trans, int64_t m, int64_t n, int64_t kl, int64_t ku, \
+                          type alpha, const type *a, int64_t ld, int row_major, \
+                          const type *x, int64_t incx, type beta, \
+                          type *y, int64_t incy) { \
+    int64_t ylen = trans ? n : m; \
+    int64_t xlen = trans ? m : n; \
+    if (ylen <= 0) return 0; \
+    if (alpha == 0 && beta == 1) return 0; \
+    if (beta != 1) \
+        for (int64_t i = 0; i < ylen; ++i) y[i * incy] = beta == 0 ? 0 : beta * y[i * incy]; \
+    if (alpha == 0 || xlen <= 0) return 0; \
+    int dot_form = (row_major && !trans) || (!row_major && trans); \
+    int64_t major_dim = row_major ? m : n; \
+    int64_t minor_dim = row_major ? n : m; \
+    int64_t below = row_major ? kl : ku; \
+    int64_t above = row_major ? ku : kl; \
+    if (dot_form) { \
+        for (int64_t major = 0; major < major_dim; ++major) { \
+            int64_t lo = major > below ? major - below : 0; \
+            int64_t hi = major + above < minor_dim - 1 ? major + above : minor_dim - 1; \
+            int64_t count = hi - lo + 1; \
+            if (count > 0) { \
+                const type *a_slice = a + major * ld + (lo - major + below); \
+                type dot = ts_blas_dot_##suffix(count, a_slice, x + lo * incx, incx); \
+                y[major * incy] += alpha * dot; \
+            } \
+        } \
+    } else { \
+        for (int64_t major = 0; major < major_dim; ++major) { \
+            int64_t lo = major > below ? major - below : 0; \
+            int64_t hi = major + above < minor_dim - 1 ? major + above : minor_dim - 1; \
+            int64_t count = hi - lo + 1; \
+            if (count > 0) { \
+                const type *a_slice = a + major * ld + (lo - major + below); \
+                type scale = alpha * x[major * incx]; \
+                ts_blas_axpy_##suffix(count, scale, a_slice, 1, y + lo * incy, incy); \
+            } \
+        } \
     } \
     return 0; \
 } \
@@ -645,6 +693,14 @@ int ts_blas_gemv_##suffix(int64_t m, int64_t n, type alpha, const type *a, int64
                           int64_t acs, const type *x, int64_t incx, type beta, \
                           type *y, int64_t incy) { \
     return TS_BLAS_PICK(gemv, suffix, m, n, alpha, a, ars, acs, x, incx, beta, y, incy); \
+} \
+\
+int ts_blas_gbmv_##suffix(int trans, int64_t m, int64_t n, int64_t kl, int64_t ku, \
+                          type alpha, const type *a, int64_t ld, int row_major, \
+                          const type *x, int64_t incx, type beta, \
+                          type *y, int64_t incy) { \
+    return TS_BLAS_PICK(gbmv, suffix, trans, m, n, kl, ku, alpha, a, ld, row_major, \
+                        x, incx, beta, y, incy); \
 } \
 \
 int ts_blas_ger_##suffix(int64_t m, int64_t n, type alpha, const type *x, int64_t incx, \

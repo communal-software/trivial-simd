@@ -3,12 +3,18 @@
 (defvar *native-available-p* nil)
 
 (defun native-library-path ()
-  (let ((name (case (uiop:operating-system)
-                (:macosx #p"build/libtrivial_simd.dylib")
-                (:linux #p"build/libtrivial_simd.so")
-                ((:windows :win) #p"build/trivial_simd.dll"))))
-    (when name
-      (merge-pathnames name (asdf:system-source-directory "trivial-simd")))))
+  (let ((directory (asdf:system-source-directory "trivial-simd")))
+    (case (uiop:operating-system)
+      (:macosx (merge-pathnames #p"build/libtrivial_simd.dylib" directory))
+      (:linux (merge-pathnames #p"build/libtrivial_simd.so" directory))
+      ((:windows :win)
+       (let ((plain (merge-pathnames #p"build/trivial_simd.dll" directory))
+             (prefixed (merge-pathnames #p"build/libtrivial_simd.dll" directory)))
+         (cond
+           ((and (probe-file plain) (probe-file prefixed))
+            (if (> (file-write-date prefixed) (file-write-date plain)) prefixed plain))
+           ((probe-file plain) plain)
+           (t prefixed))))))
 
 (let ((path (native-library-path)))
   (when (and path (probe-file path))
@@ -261,6 +267,16 @@
   (a :pointer) (a-row-stride :int64) (a-column-stride :int64)
   (x :pointer) (x-increment :int64) (beta :double)
   (y :pointer) (y-increment :int64))
+(define-native ("ts_blas_gbmv_f32" %native-blas-gbmv-f32) :int
+  (trans :int) (m :int64) (n :int64) (kl :int64) (ku :int64)
+  (alpha :float) (a :pointer) (ld :int64) (row-major :int)
+  (x :pointer) (x-increment :int64) (beta :float)
+  (y :pointer) (y-increment :int64))
+(define-native ("ts_blas_gbmv_f64" %native-blas-gbmv-f64) :int
+  (trans :int) (m :int64) (n :int64) (kl :int64) (ku :int64)
+  (alpha :double) (a :pointer) (ld :int64) (row-major :int)
+  (x :pointer) (x-increment :int64) (beta :double)
+  (y :pointer) (y-increment :int64))
 (define-native ("ts_blas_ger_f32" %native-blas-ger-f32) :int
   (m :int64) (n :int64) (alpha :float)
   (x :pointer) (x-increment :int64) (y :pointer) (y-increment :int64)
@@ -285,6 +301,7 @@
                 "ts_blas_rank_f32" "ts_blas_rank_f64"
                 "ts_blas_triangular_f32" "ts_blas_triangular_f64"
                 "ts_blas_gemv_f32" "ts_blas_gemv_f64"
+                "ts_blas_gbmv_f32" "ts_blas_gbmv_f64"
                 "ts_blas_ger_f32" "ts_blas_ger_f64"
                 "ts_blas_trsv_f32" "ts_blas_trsv_f64"))))
 
